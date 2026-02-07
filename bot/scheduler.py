@@ -1,50 +1,24 @@
-"""Scheduled tasks — APScheduler cron triggers invoking Claude Code."""
+"""Schedule helpers — state tracking and listing.
+
+Schedules are managed by launchd (macOS system scheduler).
+Edit config/schedules.yaml and run scripts/schedule-sync.py to sync.
+"""
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import discord
 import yaml
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 logger = logging.getLogger(__name__)
 
 TZ = ZoneInfo("America/Chicago")
-
-
-def _parse_cron(expr: str) -> dict:
-    """Parse a standard cron expression into APScheduler kwargs.
-
-    Format: minute hour day_of_month month day_of_week
-    """
-    parts = expr.strip().split()
-    if len(parts) != 5:
-        raise ValueError(f"Invalid cron expression: {expr}")
-    return {
-        "minute": parts[0],
-        "hour": parts[1],
-        "day": parts[2],
-        "month": parts[3],
-        "day_of_week": parts[4],
-    }
-
-
-def _load_schedules(config_dir: Path) -> dict:
-    """Load schedule definitions from schedules.yaml."""
-    path = config_dir / "schedules.yaml"
-    if not path.exists():
-        logger.warning("No schedules.yaml found at %s", path)
-        return {}
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    return data.get("schedules", {})
+LABEL_PREFIX = "com.clawcode.schedule."
 
 
 def _update_state(data_dir: Path, task_name: str) -> None:
@@ -62,96 +36,75 @@ def _update_state(data_dir: Path, task_name: str) -> None:
     state_path.write_text(json.dumps(state, indent=2))
 
 
-# Store client reference for scheduler callbacks
-_client: discord.Client | None = None
+def _load_schedules(config_dir: Path) -> dict:
+    """Load schedule definitions from schedules.yaml."""
+    path = config_dir / "schedules.yaml"
+    if not path.exists():
+        logger.warning("No schedules.yaml found at %s", path)
+        return {}
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    return data.get("schedules", {})
 
 
-def _run_scheduled_task_sync(task_name: str, prompt: str) -> None:
-    """Wrapper that schedules the async task on the bot's event loop."""
-    if _client is None:
-        logger.error("Client not set for scheduled task: %s", task_name)
-        return
-    asyncio.ensure_future(_run_scheduled_task(_client, task_name, prompt))
+def _get_launchd_status() -> dict[str, bool]:
+    """Check which clawcode schedule agents are loaded in launchd.
 
-
-async def _run_scheduled_task(
-    client: discord.Client,
-    task_name: str,
-    prompt: str,
-) -> None:
-    """Execute a scheduled task: invoke Claude, post result to Discord."""
-    config = client.config  # type: ignore[attr-defined]
-    bridge = client.bridge  # type: ignore[attr-defined]
-
-    logger.info("Running scheduled task: %s", task_name)
-
+    Returns a dict of {schedule_name: is_loaded}.
+    """
     try:
-        response = await bridge.invoke_scheduled(prompt=prompt)
-
-        # Post to configured Discord channel
-        channel = client.get_channel(config.discord.channel_id)
-        if channel:
-            from .main import split_message
-
-            header = f"**Scheduled: {task_name}**\n"
-            for chunk in split_message(header + response):
-                await channel.send(chunk)
-        else:
-            logger.error("Cannot find Discord channel %d", config.discord.channel_id)
-
-        _update_state(Path(config.paths.data_dir), task_name)
-        logger.info("Scheduled task completed: %s", task_name)
-
+        result = subprocess.run(
+            ["launchctl", "list"],
+            capture_output=True,
+            text=True,
+        )
+        loaded = {}
+        for line in result.stdout.splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 3 and parts[2].startswith(LABEL_PREFIX):
+                name = parts[2][len(LABEL_PREFIX):]
+                loaded[name] = True
+        return loaded
     except Exception:
-        logger.exception("Scheduled task failed: %s", task_name)
-
-        try:
-            channel = client.get_channel(config.discord.channel_id)
-            if channel:
-                await channel.send(
-                    f"**Scheduled task failed: {task_name}**\nCheck logs for details."
-                )
-        except Exception:
-            logger.exception("Failed to post error to Discord")
+        return {}
 
 
-async def start_scheduler(client: discord.Client) -> AsyncIOScheduler:
-    """Load schedules and start the APScheduler."""
-    global _client
-    _client = client
+def list_schedules(config_dir: Path, data_dir: Path) -> str:
+    """Format a summary of all schedules with status and last-run times.
 
-    config = client.config  # type: ignore[attr-defined]
-    config_dir = Path(config.paths.project_dir) / "config"
+    Reads from schedules.yaml, state.json, and launchd status.
+    """
     schedules = _load_schedules(config_dir)
+    if not schedules:
+        return "No schedules defined in config/schedules.yaml"
 
-    scheduler = AsyncIOScheduler(timezone=TZ)
+    # Load last-run state
+    state_path = data_dir / "state.json"
+    try:
+        state = json.loads(state_path.read_text()) if state_path.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        state = {}
+    last_runs = state.get("last_run", {})
 
+    # Check launchd
+    launchd_status = _get_launchd_status()
+
+    lines = ["**Schedules**", ""]
     for name, sched in schedules.items():
-        if not sched.get("enabled", True):
-            logger.info("Skipping disabled schedule: %s", name)
-            continue
+        enabled = sched.get("enabled", True)
+        cron = sched.get("cron", "?")
+        loaded = launchd_status.get(name, False)
 
-        cron_expr = sched["cron"]
-        prompt = sched["prompt"]
+        if enabled and loaded:
+            status = "active"
+        elif enabled and not loaded:
+            status = "enabled (not loaded — run schedule sync)"
+        else:
+            status = "disabled"
 
-        try:
-            cron_kwargs = _parse_cron(cron_expr)
-            trigger = CronTrigger(timezone=TZ, **cron_kwargs)
+        last_run = last_runs.get(name, "never")
 
-            scheduler.add_job(
-                _run_scheduled_task_sync,
-                trigger,
-                id=name,
-                kwargs={"task_name": name, "prompt": prompt},
-                replace_existing=True,
-            )
-            logger.info("Registered schedule: %s (%s)", name, cron_expr)
+        lines.append(f"- **{name}** [{status}]")
+        lines.append(f"  Cron: `{cron}` | Last run: {last_run}")
 
-        except Exception:
-            logger.exception("Failed to register schedule: %s", name)
-
-    scheduler.start()
-    logger.info("Scheduler started with %d tasks", len(schedules))
-
-    client._scheduler = scheduler  # type: ignore[attr-defined]
-    return scheduler
+    return "\n".join(lines)

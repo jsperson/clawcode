@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import signal
 import sys
+from datetime import datetime
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import discord
 
@@ -13,6 +18,25 @@ from .claude_bridge import ClaudeBridge
 from .config import Config
 
 logger = logging.getLogger(__name__)
+
+TZ = ZoneInfo("America/Chicago")
+
+# ---------------------------------------------------------------------------
+# Bot state helpers
+# ---------------------------------------------------------------------------
+
+
+def _update_bot_state(config: Config, event: str) -> None:
+    """Write a bot lifecycle event to data/state.json."""
+    state_path = Path(config.paths.data_dir) / "state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        state = {}
+    state[event] = datetime.now(TZ).isoformat()
+    state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
 
 # ---------------------------------------------------------------------------
 # Discord message splitting — respect 2000 char limit
@@ -79,6 +103,50 @@ def create_bot(config: Config) -> discord.Client:
     @client.event
     async def on_ready() -> None:
         logger.info("ClawCode bot connected as %s", client.user)
+        _update_bot_state(config, "bot_started_at")
+        try:
+            from .memory import append_daily_log
+            append_daily_log(config, "Bot startup (graceful)")
+        except ImportError:
+            pass
+
+    async def _shutdown() -> None:
+        """Run cleanup before the bot process exits."""
+        logger.info("Bot shutting down — running cleanup")
+
+        # 1. Stop file watcher
+        observer = getattr(client, "_file_observer", None)
+        if observer is not None:
+            try:
+                observer.stop()
+                observer.join(timeout=5)
+                logger.info("File watcher stopped")
+            except Exception:
+                logger.exception("Error stopping file watcher")
+
+        # 2. Save sessions
+        try:
+            bridge.save_sessions()
+        except Exception:
+            logger.exception("Error saving sessions")
+
+        # 3. Append shutdown marker to daily log
+        try:
+            from .memory import append_daily_log
+            append_daily_log(config, "Bot shutdown (graceful)")
+        except Exception:
+            logger.exception("Error writing shutdown log")
+
+        # 4. Write bot_stopped_at to state.json
+        _update_bot_state(config, "bot_stopped_at")
+        logger.info("Cleanup complete")
+
+        # 5. Close the Discord client
+        if not client.is_closed():
+            await client.close()
+
+    # Expose for signal handler
+    client._shutdown = _shutdown  # type: ignore[attr-defined]
 
     @client.event
     async def on_message(message: discord.Message) -> None:
@@ -96,6 +164,13 @@ def create_bot(config: Config) -> discord.Client:
 
         user_text = message.content.strip()
         if not user_text:
+            return
+
+        # Restart command — trigger graceful shutdown, launchd restarts
+        if user_text == "!restart":
+            logger.info("Restart requested by %s", message.author)
+            await message.channel.send("Restarting. Back in ~10 seconds.")
+            await _shutdown()
             return
 
         logger.info("Message from %s: %s", message.author, user_text[:100])
@@ -207,13 +282,8 @@ def main() -> None:
         else:
             logger.info("No MCP servers configured")
 
-        # Phase 6: Scheduler
-        try:
-            from .scheduler import start_scheduler
-            await start_scheduler(client)
-            logger.info("Scheduler started")
-        except ImportError:
-            logger.debug("Scheduler not yet available")
+        # Schedules run via launchd — no in-process scheduler needed.
+        # Edit config/schedules.yaml and run scripts/schedule-sync.py to sync.
 
         # Phase 7: File watcher
         try:
@@ -222,6 +292,12 @@ def main() -> None:
             logger.info("File watcher started")
         except ImportError:
             logger.debug("File watcher not yet available")
+
+        # Register SIGTERM handler for graceful shutdown (launchd sends SIGTERM)
+        loop = asyncio.get_running_loop()
+        shutdown = getattr(client, "_shutdown", None)
+        if shutdown:
+            loop.add_signal_handler(signal.SIGTERM, lambda: asyncio.ensure_future(shutdown()))
 
     client.setup_hook = setup_hook  # type: ignore[method-assign]
 
