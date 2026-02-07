@@ -200,6 +200,13 @@ def main() -> None:
         if original_setup_hook:
             await original_setup_hook()
 
+        # MCP servers
+        if config.mcp.servers:
+            for s in config.mcp.servers:
+                logger.info("MCP server configured: %s (%s)", s.name, s.transport)
+        else:
+            logger.info("No MCP servers configured")
+
         # Phase 6: Scheduler
         try:
             from .scheduler import start_scheduler

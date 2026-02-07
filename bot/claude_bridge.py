@@ -5,9 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 import uuid
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .config import Config
 
@@ -28,6 +30,38 @@ class ClaudeBridge:
         self.config = config
         self._semaphore = asyncio.Semaphore(1)
         self._sessions: dict[str, SessionInfo] = {}  # channel_id -> SessionInfo
+        self._mcp_config_path: Path | None = self._build_mcp_config()
+
+    def _build_mcp_config(self) -> Path | None:
+        """Write MCP server config JSON for the Claude CLI --mcp-config flag.
+
+        Returns the path to the written file, or None if no servers configured.
+        """
+        if not self.config.mcp.servers:
+            return None
+
+        mcp_servers = {}
+        for srv in self.config.mcp.servers:
+            entry: dict = {}
+            if srv.transport == "stdio":
+                if srv.command:
+                    entry["command"] = srv.command
+                if srv.args:
+                    entry["args"] = srv.args
+            else:
+                if srv.url:
+                    entry["url"] = srv.url
+            if srv.env:
+                entry["env"] = srv.env
+            mcp_servers[srv.name] = entry
+
+        config_data = {"mcpServers": mcp_servers}
+        data_dir = Path(self.config.paths.data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        config_path = data_dir / ".mcp-config.json"
+        config_path.write_text(json.dumps(config_data, indent=2) + "\n")
+        logger.info("Wrote MCP config to %s (%d servers)", config_path, len(mcp_servers))
+        return config_path
 
     def _get_session(self, channel_id: str) -> SessionInfo:
         """Get or create a session for a channel, expiring stale sessions."""
@@ -55,8 +89,12 @@ class ClaudeBridge:
             self.config.claude.path,
             "--print",
             "--output-format", "json",
+            "--dangerously-skip-permissions",
             "--add-dir", self.config.vault.path,
         ]
+
+        if self._mcp_config_path:
+            cmd.extend(["--mcp-config", str(self._mcp_config_path)])
 
         if session.message_count == 0:
             # First message: create a new session with specific ID
@@ -131,12 +169,17 @@ class ClaudeBridge:
         )
 
         async with self._semaphore:
+            env = os.environ.copy()
+            for server in self.config.mcp.servers:
+                env.update(server.env)
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=self.config.paths.project_dir,
+                env=env,
             )
 
             try:
