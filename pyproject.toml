@@ -1,0 +1,22 @@
+[project]
+name = "clawcode"
+version = "0.1.0"
+description = "Personal AI assistant using Claude Code CLI as backend"
+requires-python = ">=3.11"
+dependencies = [
+    "discord.py>=2.4,<3",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "apscheduler>=3.10,<4",
+    "watchdog>=4.0",
+]
+
+[project.scripts]
+clawcode-bot = "bot.main:main"
+
+[tool.setuptools.packages.find]
+include = ["bot*", "skills*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

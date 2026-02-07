@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# ClawCode CLI — launches Claude Code with ClawCode context
+set -euo pipefail
+
+CLAWCODE_DIR="$HOME/clawcode"
+CLAUDE="$HOME/.npm-global/bin/claude"
+VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
+
+# Ensure project dir exists
+if [ ! -d "$CLAWCODE_DIR" ]; then
+    echo "Error: $CLAWCODE_DIR does not exist" >&2
+    exit 1
+fi
+
+# cd so .claude/CLAUDE.md is loaded automatically
+cd "$CLAWCODE_DIR"
+
+if [ $# -eq 0 ]; then
+    # Interactive session
+    exec "$CLAUDE" --add-dir "$VAULT"
+elif [ "$1" = "--continue" ]; then
+    # Resume last session
+    shift
+    exec "$CLAUDE" --continue --add-dir "$VAULT" "$@"
+else
+    # One-shot query
+    exec "$CLAUDE" --print --add-dir "$VAULT" -p "$*"
+fi
