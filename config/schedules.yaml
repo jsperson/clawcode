@@ -1,0 +1,25 @@
+schedules:
+  morning_briefing:
+    cron: "0 8 * * *"
+    prompt: "Morning briefing: today's calendar, reminders due, inbox items, yesterday's summary"
+    enabled: true
+
+  inbox_check:
+    cron: "*/30 * * * *"
+    prompt: "/process-inbox"
+    enabled: true
+
+  reminder_check:
+    cron: "0 * * * *"
+    prompt: "Check remindctl for overdue and due-today items. Surface anything that needs attention."
+    enabled: true
+
+  end_of_day:
+    cron: "0 18 * * *"
+    prompt: "End of day: summarize what happened, outstanding items, write to daily log"
+    enabled: true
+
+  weekly_review:
+    cron: "0 16 * * 0"
+    prompt: "Weekly review: summarize this week's daily logs, suggest items to promote to MEMORY.md"
+    enabled: true

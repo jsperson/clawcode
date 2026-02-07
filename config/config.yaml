@@ -1,0 +1,31 @@
+discord:
+  channel_id: ${DISCORD_CHANNEL_ID}
+  guild_id: ${DISCORD_GUILD_ID}
+
+claude:
+  path: ~/.npm-global/bin/claude
+  timeout_seconds: 300
+  session_expiry_minutes: 30
+
+vault:
+  path: ~/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott
+
+paths:
+  project_dir: ~/clawcode
+  skills_dir: ~/clawcode/skills
+  memory_dir: ~/clawcode/memory
+  data_dir: ~/clawcode/data
+
+file_watch:
+  enabled: true
+  debounce_seconds: 5
+  ignore_patterns: ["*.icloud", ".DS_Store", ".obsidian/*", "*~"]
+  watches:
+    - path: "${vault_path}/Inbox"
+      "on": new_file
+      action: notify
+      prompt: "New file in Inbox: {filename}. Classify and suggest filing."
+    - path: "${vault_path}/Personal Notes/Inbound Notes"
+      "on": new_file
+      action: notify
+      prompt: "New handwritten note PDF: {filename}."
