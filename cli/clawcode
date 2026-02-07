@@ -5,6 +5,7 @@ set -euo pipefail
 CLAWCODE_DIR="$HOME/clawcode"
 CLAUDE="$HOME/.npm-global/bin/claude"
 VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
+VENV_PYTHON="$CLAWCODE_DIR/.venv/bin/python"
 
 # Ensure project dir exists
 if [ ! -d "$CLAWCODE_DIR" ]; then
@@ -18,13 +19,119 @@ cd "$CLAWCODE_DIR"
 if [ $# -eq 0 ]; then
     # Interactive session
     exec "$CLAUDE" --add-dir "$VAULT"
+
 elif [ "$1" = "doctor" ]; then
     # Health check
-    exec "$CLAWCODE_DIR/.venv/bin/python" "$CLAWCODE_DIR/scripts/doctor.py"
+    exec "$VENV_PYTHON" "$CLAWCODE_DIR/scripts/doctor.py"
+
+elif [ "$1" = "schedule" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo "Usage: clawcode schedule <sync|list|logs>" >&2
+        echo "" >&2
+        echo "Commands:" >&2
+        echo "  sync          Sync schedules.yaml to launchd agents" >&2
+        echo "  list          Show current schedules and status" >&2
+        echo "  logs <name>   Tail the log for a schedule" >&2
+        exit 1
+    fi
+
+    subcmd="$1"
+    shift
+
+    case "$subcmd" in
+        sync)
+            exec "$VENV_PYTHON" "$CLAWCODE_DIR/scripts/schedule-sync.py"
+            ;;
+        list)
+            # Quick list via launchctl + schedules.yaml
+            echo "ClawCode Schedules"
+            echo "=================="
+            echo ""
+
+            # Show YAML-defined schedules
+            if [ -f "$CLAWCODE_DIR/config/schedules.yaml" ]; then
+                "$VENV_PYTHON" -c "
+import yaml, json, subprocess
+from pathlib import Path
+
+project = Path('$CLAWCODE_DIR')
+
+with open(project / 'config' / 'schedules.yaml') as f:
+    schedules = yaml.safe_load(f).get('schedules', {})
+
+# Load state
+state_path = project / 'data' / 'state.json'
+try:
+    state = json.loads(state_path.read_text()) if state_path.exists() else {}
+except:
+    state = {}
+last_runs = state.get('last_run', {})
+
+# Check launchd
+result = subprocess.run(['launchctl', 'list'], capture_output=True, text=True)
+loaded = set()
+for line in result.stdout.splitlines():
+    parts = line.split('\t')
+    if len(parts) >= 3 and parts[2].startswith('com.clawcode.schedule.'):
+        loaded.add(parts[2].replace('com.clawcode.schedule.', ''))
+
+for name, sched in schedules.items():
+    enabled = sched.get('enabled', True)
+    cron = sched.get('cron', '?')
+    is_loaded = name in loaded
+
+    if enabled and is_loaded:
+        status = 'active'
+    elif enabled:
+        status = 'enabled (not loaded)'
+    else:
+        status = 'disabled'
+
+    last = last_runs.get(name, 'never')
+    print(f'  {name:20s}  [{status:20s}]  cron: {cron:15s}  last: {last}')
+"
+            else
+                echo "  No schedules.yaml found"
+            fi
+            ;;
+        logs)
+            if [ $# -eq 0 ]; then
+                echo "Usage: clawcode schedule logs <name>" >&2
+                echo "" >&2
+                echo "Available logs:" >&2
+                ls "$CLAWCODE_DIR/data/logs/schedule-"*.log 2>/dev/null | while read f; do
+                    basename "$f" .log | sed 's/^schedule-/  /'
+                done
+                exit 1
+            fi
+            logfile="$CLAWCODE_DIR/data/logs/schedule-$1.log"
+            if [ -f "$logfile" ]; then
+                tail -f "$logfile"
+            else
+                echo "No log file found: $logfile" >&2
+                echo "The schedule may not have run yet." >&2
+                exit 1
+            fi
+            ;;
+        *)
+            echo "Unknown schedule command: $subcmd" >&2
+            echo "Usage: clawcode schedule <sync|list|logs>" >&2
+            exit 1
+            ;;
+    esac
+
+elif [ "$1" = "restart" ]; then
+    # Graceful restart via launchd — sends SIGTERM, then restarts
+    echo "Restarting ClawCode bot..."
+    launchctl kickstart -k "gui/$(id -u)/com.clawcode.bot"
+    echo "Restart signal sent. Bot should be back within ~10 seconds."
+
 elif [ "$1" = "--continue" ]; then
     # Resume last session
     shift
     exec "$CLAUDE" --continue --add-dir "$VAULT" "$@"
+
 else
     # One-shot query
     exec "$CLAUDE" --print --add-dir "$VAULT" -p "$*"

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SessionInfo:
     session_id: str
-    last_used: float  # time.monotonic()
+    last_used: float  # time.time() (wall clock, survives restarts)
     message_count: int = 0
 
 
@@ -31,6 +31,8 @@ class ClaudeBridge:
         self._semaphore = asyncio.Semaphore(1)
         self._sessions: dict[str, SessionInfo] = {}  # channel_id -> SessionInfo
         self._mcp_config_path: Path | None = self._build_mcp_config()
+        self._sessions_path = Path(config.paths.data_dir) / "sessions.json"
+        self._load_sessions()
 
     def _build_mcp_config(self) -> Path | None:
         """Write MCP server config JSON for the Claude CLI --mcp-config flag.
@@ -63,9 +65,48 @@ class ClaudeBridge:
         logger.info("Wrote MCP config to %s (%d servers)", config_path, len(mcp_servers))
         return config_path
 
+    def _load_sessions(self) -> None:
+        """Load persisted sessions from disk, pruning any past the expiry window."""
+        if not self._sessions_path.exists():
+            return
+        try:
+            data = json.loads(self._sessions_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Could not load sessions from %s: %s", self._sessions_path, e)
+            return
+
+        now = time.time()
+        expiry = self.config.claude.session_expiry_minutes * 60
+        loaded = 0
+        for channel_id, entry in data.items():
+            last_used = entry.get("last_used", 0)
+            if (now - last_used) < expiry:
+                self._sessions[channel_id] = SessionInfo(
+                    session_id=entry["session_id"],
+                    last_used=last_used,
+                    message_count=entry.get("message_count", 0),
+                )
+                loaded += 1
+        logger.info("Loaded %d sessions (%d expired)", loaded, len(data) - loaded)
+
+    def save_sessions(self) -> None:
+        """Persist current sessions to disk."""
+        data = {}
+        for channel_id, info in self._sessions.items():
+            data[channel_id] = {
+                "session_id": info.session_id,
+                "last_used": info.last_used,
+                "message_count": info.message_count,
+            }
+        self._sessions_path.parent.mkdir(parents=True, exist_ok=True)
+        self._sessions_path.write_text(
+            json.dumps(data, indent=2) + "\n", encoding="utf-8"
+        )
+        logger.info("Saved %d sessions to %s", len(data), self._sessions_path)
+
     def _get_session(self, channel_id: str) -> SessionInfo:
         """Get or create a session for a channel, expiring stale sessions."""
-        now = time.monotonic()
+        now = time.time()
         expiry = self.config.claude.session_expiry_minutes * 60
 
         info = self._sessions.get(channel_id)

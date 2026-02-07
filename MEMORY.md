@@ -102,23 +102,51 @@ When Scott asks to "process my new written notes" or similar:
 
 ---
 
-## Planned Features
+## Scheduling
 
-### Graceful Shutdown / Restart
-Save session context, flush daily log on shutdown. Allow a restart command that preserves state.
+### Workflow
+Schedules are macOS launchd agents, independent of the Discord bot process.
+
+- **Source of truth:** `config/schedules.yaml`
+- **Format:** `name`, `cron` (5-field), `prompt`, `enabled`
+- **After editing:** run `scripts/schedule-sync.py` to sync to launchd
+- **Agents named:** `com.clawcode.schedule.<name>`
+- **Runner:** `scripts/schedule-runner.py <name>` — invokes Claude CLI, posts to Discord via REST API
+- **Logs:** `data/logs/schedule-<name>.log`
+- **CLI:** `clawcode schedule sync|list|logs <name>`
+
+### Key Points
+- Schedules fire even if the bot is down
+- Sync is idempotent: deletes all agents, recreates from YAML
+- Step intervals (e.g., `*/30`) use launchd `StartInterval`; specific times use `StartCalendarInterval`
+
+---
+
+## Planned Features
 
 ### OpenClaw Skill Hooks
 Share skills between ClawCode and OpenClaw systems. Currently separate with no shared state.
 
-### Background Startup
-Proper daemonized launch (launchd or nohup) so the bot doesn't depend on keeping a terminal session open.
-
-### Bot MCP Integration
-Gmail MCP (and future MCP servers) currently work in CLI sessions only. Wire MCP tools into the Discord bot bridge.
-
 ---
 
 ## Completed Features
+
+### launchd System Scheduler — 2026-02-07
+- Replaced in-process APScheduler with macOS launchd agents
+- `scripts/schedule-runner.py` — standalone task runner (Claude CLI + Discord REST)
+- `scripts/schedule-sync.py` — YAML-to-launchd plist sync (delete-all/re-push)
+- `cli/clawcode schedule sync|list|logs` — CLI subcommands
+- `skills/scheduler/SKILL.md` — scheduling workflow skill
+- Schedules fire independently of bot process
+
+### Graceful Shutdown / Restart — 2026-02-07
+- Signal handling via discord.py `on_close` — fires on SIGTERM or `client.close()`
+- Session persistence: `data/sessions.json` (channel → session_id, last_used, message_count)
+- `time.time()` wall-clock timestamps survive process restarts (replaced `time.monotonic()`)
+- Lifecycle markers: startup/shutdown in daily log + `data/state.json` timestamps
+- `!restart` Discord command: sends message, calls `client.close()`, launchd restarts
+- `clawcode restart` CLI: `launchctl kickstart -k` for terminal-initiated restarts
+- File watcher cleanup on shutdown (`observer.stop()` + `observer.join(timeout=5)`)
 
 ### Gmail MCP Server — 2026-02-07
 - `gmail-mcp` (npm, domdomegg) running as **stdio** MCP server
@@ -157,6 +185,18 @@ The **apple-reminders** skill manages Apple Reminders via `remindctl` CLI.
 - Complete or delete reminders
 
 **Tool:** Uses `remindctl` CLI tool (installed via Homebrew)
+
+### Scheduler - launchd
+**Date:** 2026-02-07
+
+The **scheduler** skill manages recurring tasks via macOS launchd agents.
+
+**When to use:**
+- Add, modify, remove, enable/disable scheduled tasks
+- Check schedule status
+- Any "every day", "every hour", "recurring", "cron" requests
+
+**Tool:** Edits `config/schedules.yaml` + runs `scripts/schedule-sync.py`
 
 ### Gmail - gmail-mcp
 **Date:** 2026-02-07
