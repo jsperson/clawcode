@@ -18,6 +18,9 @@ cd "$CLAWCODE_DIR"
 if [ $# -eq 0 ]; then
     # Interactive session
     exec "$CLAUDE" --add-dir "$VAULT"
+elif [ "$1" = "doctor" ]; then
+    # Health check
+    exec "$CLAWCODE_DIR/.venv/bin/python" "$CLAWCODE_DIR/scripts/doctor.py"
 elif [ "$1" = "--continue" ]; then
     # Resume last session
     shift

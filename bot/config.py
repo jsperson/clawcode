@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass, field
@@ -65,12 +66,28 @@ class FileWatchConfig:
 
 
 @dataclass
+class MCPServerConfig:
+    name: str
+    transport: str  # "stdio" or "http"
+    command: str | None = None
+    args: list[str] = field(default_factory=list)
+    url: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class MCPConfig:
+    servers: list[MCPServerConfig] = field(default_factory=list)
+
+
+@dataclass
 class Config:
     discord: DiscordConfig
     claude: ClaudeConfig
     vault: VaultConfig
     paths: PathsConfig
     file_watch: FileWatchConfig
+    mcp: MCPConfig = field(default_factory=MCPConfig)
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> Config:
@@ -130,10 +147,44 @@ class Config:
             watches=watches,
         )
 
+        # MCP server configuration (optional)
+        mcp = MCPConfig()
+        mcp_path = project_dir / "config" / "mcp-servers.yaml"
+        if mcp_path.exists():
+            try:
+                with open(mcp_path) as f:
+                    mcp_raw = yaml.safe_load(f) or {}
+                for name, srv in (mcp_raw.get("servers") or {}).items():
+                    transport = srv.get("transport", "stdio")
+                    command = srv.get("command")
+                    if command:
+                        command = _expand(command)
+                    args = [_expand(str(a)) for a in (srv.get("args") or [])]
+                    url = srv.get("url")
+                    if url:
+                        url = _expand(url)
+                    env = {
+                        k: _expand(str(v))
+                        for k, v in (srv.get("env") or {}).items()
+                    }
+                    mcp.servers.append(MCPServerConfig(
+                        name=name,
+                        transport=transport,
+                        command=command,
+                        args=args,
+                        url=url,
+                        env=env,
+                    ))
+            except Exception as e:
+                logging.getLogger(__name__).warning(
+                    "Failed to parse mcp-servers.yaml: %s", e
+                )
+
         return cls(
             discord=discord,
             claude=claude,
             vault=vault,
             paths=paths,
             file_watch=file_watch,
+            mcp=mcp,
         )

@@ -79,6 +79,9 @@ When Scott provides specific technical instructions (e.g., "use launchd"), do NO
 2. Update relevant documentation
 3. Document new dependencies and troubleshooting steps
 
+### Skill setup docs
+When adding a new skill, ensure its `SKILL.md` frontmatter includes `metadata.clawcode.requires.bins` listing all required CLI tools. This powers `clawcode doctor` and `scripts/setup.sh` for automated dependency checking and first-run setup. Update `config/mcp-servers.yaml` if the skill depends on an MCP server.
+
 ---
 
 ## Workflows & Commands
@@ -96,6 +99,36 @@ When Scott asks to "process my new written notes" or similar:
    - Insert entries chronologically into `Personal-Notes-YYYY.md`
    - Move processed PDF to `zzArchivedPDFs/`
 3. **Don't ask "what should I do?"** - the workflow is documented, just execute it
+
+---
+
+## Planned Features
+
+### Graceful Shutdown / Restart
+Save session context, flush daily log on shutdown. Allow a restart command that preserves state.
+
+### OpenClaw Skill Hooks
+Share skills between ClawCode and OpenClaw systems. Currently separate with no shared state.
+
+### Background Startup
+Proper daemonized launch (launchd or nohup) so the bot doesn't depend on keeping a terminal session open.
+
+### Bot MCP Integration
+Gmail MCP (and future MCP servers) currently work in CLI sessions only. Wire MCP tools into the Discord bot bridge.
+
+---
+
+## Completed Features
+
+### Gmail MCP Server — 2026-02-07
+- `gmail-mcp` (npm, domdomegg) running as **stdio** MCP server
+- OAuth credentials via Google Cloud project `gogcli-clawdbot` (Web Application: `clawcode-gmail-mcp`)
+- One-time setup: `scripts/gmail-oauth-setup.sh` gets refresh token, stores in `.env`
+- Wrapper `scripts/gmail-mcp-start.sh` exchanges refresh token for access token on each invocation
+- Registered via `claude mcp add gmail-mcp -- ~/clawcode/scripts/gmail-mcp-start.sh`
+- Skill: `skills/gmail/SKILL.md`
+- Doctor checks: OAuth creds + refresh token in `.env`
+- Note: HTTP transport had OAuth bugs in Claude Code — stdio with pre-fetched token is the reliable path
 
 ---
 
@@ -124,3 +157,15 @@ The **apple-reminders** skill manages Apple Reminders via `remindctl` CLI.
 - Complete or delete reminders
 
 **Tool:** Uses `remindctl` CLI tool (installed via Homebrew)
+
+### Gmail - gmail-mcp
+**Date:** 2026-02-07
+
+The **gmail** skill provides full Gmail access via MCP (search, read, send, draft, archive, labels, filters, attachments).
+
+**When to use:**
+- Check email, search inbox
+- Read threads, send/draft emails
+- Manage labels and filters
+
+**Tool:** `gmail-mcp` HTTP MCP server on port 9025. Draft-first for new emails — always confirm before sending.

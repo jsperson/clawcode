@@ -1,0 +1,27 @@
+# ClawCode MCP Server Configuration
+#
+# Declarative list of MCP servers that ClawCode skills depend on.
+# Both scripts/setup.sh and scripts/doctor.py read this file.
+#
+# Format:
+#   servers:
+#     server-name:
+#       command: npx
+#       args: ["-y", "@some/mcp-server"]
+#       env:
+#         KEY: "value"
+#       required_by: [skill-name]
+#       setup_notes: "Human-readable setup instructions"
+#
+# Uncomment and configure servers as skills are added.
+
+servers:
+  gmail-mcp:
+    transport: stdio
+    command: ~/clawcode/scripts/gmail-mcp-start.sh
+    env:
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
+      GOOGLE_REFRESH_TOKEN: "${GOOGLE_REFRESH_TOKEN}"
+    required_by: [gmail]
+    setup_notes: "Run scripts/gmail-oauth-setup.sh for one-time Google OAuth authorization."

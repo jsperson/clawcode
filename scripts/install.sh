@@ -18,7 +18,7 @@ echo ""
 if [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
     echo "→ Syncing project to $INSTALL_DIR..."
     mkdir -p "$INSTALL_DIR"
-    rsync -a --exclude='.venv' --exclude='__pycache__' --exclude='.git' \
+    rsync -a --exclude='.venv' --exclude='__pycache__' --exclude='.git' --exclude='.env' \
         "$SOURCE_DIR/" "$INSTALL_DIR/"
 else
     echo "→ Already at $INSTALL_DIR"
@@ -82,6 +82,11 @@ if [ ! -f .env ]; then
 DISCORD_TOKEN=your-discord-bot-token-here
 DISCORD_CHANNEL_ID=your-channel-id-here
 DISCORD_GUILD_ID=your-guild-id-here
+
+# Gmail MCP OAuth Credentials
+# Create at https://console.cloud.google.com/apis/credentials
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
 ENV
     echo "  ⚠️  Edit .env with your Discord credentials before starting the bot."
 fi
@@ -103,15 +108,31 @@ if [ ! -L "$HOME/bin/clawcode" ]; then
     echo "  Symlinked ~/bin/clawcode"
 fi
 
-# Check if ~/bin is in PATH
+# Ensure ~/bin is in PATH via shell profile
 if ! echo "$PATH" | grep -q "$HOME/bin"; then
-    echo "  ⚠️  Add ~/bin to your PATH: export PATH=\"\$HOME/bin:\$PATH\""
+    SHELL_RC="$HOME/.zshrc"
+    [ -n "${BASH_VERSION:-}" ] && SHELL_RC="$HOME/.bashrc"
+    if [ -f "$SHELL_RC" ] && ! grep -q '$HOME/bin' "$SHELL_RC"; then
+        echo 'export PATH="$HOME/bin:$PATH"' >> "$SHELL_RC"
+        echo "  Added ~/bin to PATH in $SHELL_RC"
+    fi
+    export PATH="$HOME/bin:$PATH"
 fi
 
 # ---------------------------------------------------------------------------
 # 8. Make scripts executable
 # ---------------------------------------------------------------------------
 chmod +x scripts/*.sh
+
+# ---------------------------------------------------------------------------
+# 8b. Install gmail-mcp npm package (if npm available)
+# ---------------------------------------------------------------------------
+if command -v npm &>/dev/null; then
+    if ! npm list -g gmail-mcp &>/dev/null 2>&1; then
+        echo "→ Installing gmail-mcp npm package..."
+        npm install -g gmail-mcp || echo "  ⚠️  gmail-mcp install failed — install manually: npm install -g gmail-mcp"
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # 9. Install launchd plists
@@ -143,3 +164,6 @@ echo ""
 echo "To start all services:"
 echo "  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.clawcode.bot.plist"
 echo "  launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.clawcode.memory-sync.plist"
+echo ""
+echo "For Gmail MCP setup:"
+echo "  ~/clawcode/scripts/gmail-oauth-setup.sh"
