@@ -16,6 +16,7 @@ data/state.json
 data/logs/
 data/context.cache
 data/sessions.json
+data/memory.db
 data/.mcp-config.json
 
 # macOS

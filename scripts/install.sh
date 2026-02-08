@@ -145,11 +145,14 @@ for plist in launchd/*.plist; do
     name=$(basename "$plist")
     label="${name%.plist}"
 
-    # Unload if already loaded
-    launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
-
     cp "$plist" "$LAUNCH_AGENTS/$name"
-    launchctl bootstrap "gui/$(id -u)" "$LAUNCH_AGENTS/$name" 2>/dev/null || true
+    if launchctl print "gui/$(id -u)/$label" &>/dev/null; then
+        # Already loaded — atomic kill-and-restart (no race condition)
+        launchctl kickstart -k "gui/$(id -u)/$label"
+    else
+        # First install — bootstrap the new agent
+        launchctl bootstrap "gui/$(id -u)" "$LAUNCH_AGENTS/$name" 2>/dev/null || true
+    fi
     echo "  Installed $name"
 done
 

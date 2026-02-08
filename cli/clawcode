@@ -208,6 +208,11 @@ for name, sched in schedules.items():
             ;;
     esac
 
+elif [ "$1" = "memory" ]; then
+    # memory search|index|stats
+    shift
+    exec "$VENV_PYTHON" -m bot.memory_search "$@"
+
 elif [ "$1" = "restart" ]; then
     # Graceful restart via launchd — sends SIGTERM, then restarts
     echo "Restarting ClawCode bot..."
