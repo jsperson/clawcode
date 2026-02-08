@@ -12,8 +12,16 @@ Read `USER.md` in the project root for Scott's profile, preferences, and communi
 
 ## Memory
 
-- **MEMORY.md** — Long-term curated knowledge. Read at session start. Update when Scott says "remember this" or similar.
-- **memory/YYYY-MM-DD.md** — Daily session logs. Append notable events, decisions, and outcomes.
+- **MEMORY.md** — Long-term curated knowledge. Update when Scott says "remember this".
+- **memory/YYYY-MM-DD.md** — Daily session logs.
+
+### Memory Search
+
+When you need past decisions, preferences, or historical context:
+1. Run `clawcode memory search "<query>"` before reading files directly
+2. Use `--source memory` for curated knowledge, `--source daily` for logs
+3. Use `--limit 10` if 5 results aren't enough
+4. Fall back to reading MEMORY.md directly if search returns nothing
 
 ## Key Paths
 

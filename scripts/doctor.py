@@ -185,6 +185,42 @@ def check_context_cache() -> bool:
     )
 
 
+def check_memory_index() -> bool:
+    """Check if the memory search index exists and has chunks."""
+    db_path = PROJECT_DIR / "data" / "memory.db"
+    if not db_path.exists():
+        return check(
+            "Memory index",
+            False,
+            "",
+            "data/memory.db not found",
+            fix="Run: clawcode memory index",
+            warn=True,
+        )
+    try:
+        import sqlite3
+        conn = sqlite3.connect(str(db_path))
+        count = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
+        conn.close()
+        return check(
+            "Memory index",
+            count > 0,
+            f"{count} chunks indexed",
+            "index is empty",
+            fix="Run: clawcode memory index",
+            warn=True,
+        )
+    except Exception as e:
+        return check(
+            "Memory index",
+            False,
+            "",
+            f"could not read: {e}",
+            fix="Run: clawcode memory index",
+            warn=True,
+        )
+
+
 def check_macos_reminders() -> bool:
     """Check if Reminders access works via remindctl."""
     if not shutil.which("remindctl"):
@@ -561,6 +597,7 @@ def main():
         all_ok &= result
     all_ok &= check_mcp_servers()
     check_context_cache()  # optional, don't fail on it
+    check_memory_index()  # optional, don't fail on it
 
     section("MCP Services")
     for result in check_gmail_mcp():

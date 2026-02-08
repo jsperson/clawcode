@@ -60,6 +60,16 @@ def build_context(config: Config) -> str:
     except ImportError:
         logger.debug("Skills loader not available")
 
+    # Memory search instructions
+    parts.append(
+        "## Memory Search\n\n"
+        "When you need past decisions, preferences, or historical context, "
+        "run `clawcode memory search \"<query>\"` before reading files directly. "
+        "Use `--source memory` for curated knowledge, `--source daily` for logs. "
+        "Use `--limit 10` if 5 results aren't enough. "
+        "Fall back to reading MEMORY.md directly if search returns nothing."
+    )
+
     context = "\n\n".join(parts)
     logger.info("Built context: %d chars", len(context))
     return context
