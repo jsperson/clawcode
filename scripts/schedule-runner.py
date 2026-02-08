@@ -116,7 +116,17 @@ def update_state(task_name: str) -> None:
 
 
 def build_context() -> str | None:
-    """Build system prompt context from memory files."""
+    """Load context from the unified cache, falling back to memory files.
+
+    Prefers data/context.cache (built by bot or bot/context.py) which includes
+    identity, user profile, and skill summaries. Falls back to just memory
+    files if the cache doesn't exist yet.
+    """
+    cache_path = PROJECT_DIR / "data" / "context.cache"
+    if cache_path.exists() and cache_path.stat().st_size > 0:
+        return cache_path.read_text(encoding="utf-8")
+
+    # Fallback: memory only (no skill context)
     parts: list[str] = []
 
     memory_path = PROJECT_DIR / "MEMORY.md"

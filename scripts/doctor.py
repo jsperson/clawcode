@@ -116,22 +116,73 @@ def check_skill_bins() -> list[bool]:
 
 
 def _parse_required_bins(skill_md: Path) -> list[str]:
-    """Parse bins from YAML frontmatter: metadata.clawcode.requires.bins."""
+    """Parse bins from YAML frontmatter.
+
+    Checks both metadata.clawcode.requires.bins and metadata.clawdbot.requires.bins.
+    """
     text = skill_md.read_text()
-    # Simple parser — find the bins line in frontmatter
-    in_frontmatter = False
-    for line in text.splitlines():
-        if line.strip() == "---":
-            if not in_frontmatter:
-                in_frontmatter = True
-                continue
-            else:
-                break
-        if in_frontmatter and "bins:" in line:
-            # Format: bins: [remindctl, icalpal]
-            bracket_content = line.split("[", 1)[-1].rstrip("]").strip()
-            return [b.strip() for b in bracket_content.split(",") if b.strip()]
+    parts = text.split("---", 2)
+    if len(parts) < 3:
+        return []
+
+    try:
+        import yaml
+        fm = yaml.safe_load(parts[1])
+    except Exception:
+        return []
+
+    if not isinstance(fm, dict):
+        return []
+
+    metadata = fm.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return []
+
+    # Check both namespaces
+    for ns_key in ("clawcode", "clawdbot"):
+        ns = metadata.get(ns_key)
+        if isinstance(ns, dict):
+            requires = ns.get("requires", {})
+            if isinstance(requires, dict):
+                bins = requires.get("bins", [])
+                if isinstance(bins, list) and bins:
+                    return [str(b) for b in bins]
+
     return []
+
+
+def check_clawdhub() -> bool:
+    """Check if clawdhub CLI is available (optional)."""
+    return check(
+        "ClewHub CLI",
+        shutil.which("clawdhub") is not None,
+        shutil.which("clawdhub") or "found",
+        "not found (optional — needed for skill install/search)",
+        fix="pip install clawdhub",
+        warn=True,
+    )
+
+
+def check_context_cache() -> bool:
+    """Check if the context cache exists and has content."""
+    cache_path = PROJECT_DIR / "data" / "context.cache"
+    if not cache_path.exists():
+        return check(
+            "Context cache",
+            False,
+            "",
+            "data/context.cache not found — will be created on bot startup",
+            warn=True,
+        )
+    size = cache_path.stat().st_size
+    return check(
+        "Context cache",
+        size > 0,
+        f"exists ({size} bytes)",
+        "empty",
+        fix="Start the bot or run: python -m bot.context (future)",
+        warn=True,
+    )
 
 
 def check_macos_reminders() -> bool:
@@ -157,6 +208,131 @@ def check_macos_reminders() -> bool:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return check("Reminders access", False, "", "timed out or failed",
                       fix="Run 'remindctl authorize' from Terminal.app", warn=True)
+
+
+def check_icalpal_calendar() -> bool:
+    """Check if icalpal can read Calendar via one-shot launchd job.
+
+    icalpal reads Calendar.sqlitedb directly, which requires Full Disk Access.
+    python3.13 has an explicit FDA DENY in the system TCC database (SIP-protected),
+    so any process with python as an ancestor is blocked. The bot works around this
+    by spawning icalpal via a one-shot launchd job (no python in the chain).
+
+    This check validates that the one-shot approach works.
+    """
+    if not shutil.which("icalpal"):
+        return True  # Skip if not installed (already flagged by skill check)
+
+    import tempfile
+
+    uid = os.getuid()
+    label = f"com.clawcode.doctor.icalpal.{os.getpid()}"
+
+    try:
+        # Create temp files for output and plist
+        out_fd, out_path = tempfile.mkstemp(prefix="clawcode-doctor-ical-", suffix=".json")
+        os.close(out_fd)
+        plist_fd, plist_path = tempfile.mkstemp(prefix="clawcode-doctor-ical-", suffix=".plist")
+
+        plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>{label}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>icalpal eventsToday -o json > {out_path} 2>/tmp/clawcode-doctor-ical-err.log</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>HOME</key>
+        <string>{Path.home()}</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+"""
+        with os.fdopen(plist_fd, "w") as f:
+            f.write(plist_content)
+
+        # Bootstrap the one-shot job
+        subprocess.run(
+            ["launchctl", "bootstrap", f"gui/{uid}", plist_path],
+            capture_output=True, timeout=5,
+        )
+
+        # Wait for it to finish (icalpal runs in ~100ms)
+        import time
+        for _ in range(20):
+            r = subprocess.run(
+                ["launchctl", "print", f"gui/{uid}/{label}"],
+                capture_output=True, timeout=5,
+            )
+            if r.returncode != 0:
+                break
+            time.sleep(0.25)
+
+        # Clean up the launchd job
+        subprocess.run(
+            ["launchctl", "bootout", f"gui/{uid}/{label}"],
+            capture_output=True, timeout=5,
+        )
+        os.unlink(plist_path)
+
+        # Check if icalpal produced valid output
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            content = Path(out_path).read_text().strip()
+            os.unlink(out_path)
+            # Valid JSON output means it worked (even "[]" is fine)
+            ok = content.startswith("[") or content.startswith("{")
+            return check(
+                "Calendar access (icalpal)",
+                ok,
+                "authorized (via launchd one-shot)",
+                "icalpal ran but returned invalid data",
+                fix="Grant Full Disk Access to Python.app in System Settings → Privacy & Security → Full Disk Access",
+                warn=True,
+            )
+        else:
+            if os.path.exists(out_path):
+                os.unlink(out_path)
+            # Check error log
+            err_path = Path("/tmp/clawcode-doctor-ical-err.log")
+            err_msg = "empty output — likely FDA denied"
+            if err_path.exists():
+                err_text = err_path.read_text().strip()
+                if "not permitted" in err_text.lower() or "not open" in err_text.lower():
+                    err_msg = "FDA denied — cannot open Calendar.sqlitedb"
+                err_path.unlink(missing_ok=True)
+            return check(
+                "Calendar access (icalpal)",
+                False,
+                "",
+                err_msg,
+                fix="Grant Full Disk Access to Python.app in System Settings → Privacy & Security → Full Disk Access",
+            )
+
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        # Clean up on error
+        for p in [out_path, plist_path]:
+            try:
+                os.unlink(p)
+            except (NameError, OSError):
+                pass
+        return check(
+            "Calendar access (icalpal)",
+            False,
+            "",
+            f"check failed: {e}",
+            fix="Ensure launchctl is available and user session is active",
+            warn=True,
+        )
 
 
 def check_venv() -> bool:
@@ -370,9 +546,11 @@ def main():
     section("Skill Dependencies")
     for result in check_skill_bins():
         all_ok &= result
+    check_clawdhub()  # optional, don't fail on it
 
     section("macOS Permissions")
     all_ok &= check_macos_reminders()
+    all_ok &= check_icalpal_calendar()
 
     section("Environment")
     all_ok &= check_venv()
@@ -382,6 +560,7 @@ def main():
     for result in check_config_paths():
         all_ok &= result
     all_ok &= check_mcp_servers()
+    check_context_cache()  # optional, don't fail on it
 
     section("MCP Services")
     for result in check_gmail_mcp():

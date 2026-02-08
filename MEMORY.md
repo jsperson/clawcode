@@ -124,12 +124,23 @@ Schedules are macOS launchd agents, independent of the Discord bot process.
 
 ## Planned Features
 
-### OpenClaw Skill Hooks
-Share skills between ClawCode and OpenClaw systems. Currently separate with no shared state.
+### Memory Search
+Replace bulk memory injection with on-demand search. Index MEMORY.md + memory/*.md with hybrid BM25 + vector search (SQLite). Provide memory_search + memory_get tools to Claude. System prompt instructs Claude to search before answering questions about history/preferences.
 
 ---
 
 ## Completed Features
+
+### ClewHub Skill Compatibility + Unified Context Layer — 2026-02-07
+- `bot/context.py` — unified context builder assembles identity + user + skill summaries, writes `data/context.cache`
+- Context cached in memory at startup, refreshed on file changes (SKILL.md, IDENTITY.md, USER.md) and `!reload`
+- CLI reads `data/context.cache` for `--append-system-prompt` — no per-invocation parsing
+- `skills/loader.py` — accepts both `metadata.clawcode` and `metadata.clawdbot` namespaces; frontmatter-less fallback; platform/binary/env gating; dropped keyword matching
+- CLI `clawcode skill list|install|search` subcommands (install/search via `clawdhub` CLI)
+- `scripts/doctor.py` — proper YAML parsing for both namespaces, `clawdhub` + context cache checks
+
+### OpenClaw Skill Hooks (ClewHub Compatibility) — 2026-02-07
+Skills can now be shared between ClawCode, Clawdbot, and ClewHub via dual-namespace metadata support.
 
 ### launchd System Scheduler — 2026-02-07
 - Replaced in-process APScheduler with macOS launchd agents

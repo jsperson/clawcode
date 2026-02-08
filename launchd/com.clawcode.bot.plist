@@ -7,9 +7,7 @@
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/jsperson/clawcode/.venv/bin/python</string>
-        <string>-m</string>
-        <string>bot.main</string>
+        <string>/Users/jsperson/clawcode/ClawCode.app/Contents/MacOS/ClawCode</string>
     </array>
 
     <key>WorkingDirectory</key>
