@@ -6,6 +6,7 @@ CLAWCODE_DIR="$HOME/clawcode"
 CLAUDE="$HOME/.npm-global/bin/claude"
 VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
 VENV_PYTHON="$CLAWCODE_DIR/.venv/bin/python"
+CONTEXT_CACHE="$CLAWCODE_DIR/data/context.cache"
 
 # Ensure project dir exists
 if [ ! -d "$CLAWCODE_DIR" ]; then
@@ -16,13 +17,99 @@ fi
 # cd so .claude/CLAUDE.md is loaded automatically
 cd "$CLAWCODE_DIR"
 
+# Build context args from cache
+_context_args() {
+    if [ -f "$CONTEXT_CACHE" ] && [ -s "$CONTEXT_CACHE" ]; then
+        echo "--append-system-prompt"
+        cat "$CONTEXT_CACHE"
+    fi
+}
+
 if [ $# -eq 0 ]; then
     # Interactive session
-    exec "$CLAUDE" --add-dir "$VAULT"
+    CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
+    if [ -n "$CONTEXT" ]; then
+        exec "$CLAUDE" --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
+    else
+        exec "$CLAUDE" --add-dir "$VAULT"
+    fi
 
 elif [ "$1" = "doctor" ]; then
     # Health check
     exec "$VENV_PYTHON" "$CLAWCODE_DIR/scripts/doctor.py"
+
+elif [ "$1" = "skill" ]; then
+    shift
+    if [ $# -eq 0 ]; then
+        echo "Usage: clawcode skill <list|install|search>" >&2
+        echo "" >&2
+        echo "Commands:" >&2
+        echo "  list                  Show installed skills and status" >&2
+        echo "  install <name>        Install a skill from ClewHub" >&2
+        echo "  search <query>        Search ClewHub for skills" >&2
+        exit 1
+    fi
+
+    subcmd="$1"
+    shift
+
+    case "$subcmd" in
+        list)
+            echo "ClawCode Skills"
+            echo "==============="
+            echo ""
+            "$VENV_PYTHON" -c "
+import sys
+sys.path.insert(0, '$CLAWCODE_DIR')
+from skills.loader import load_skills, check_eligible, _get_skill_metadata
+
+skills = load_skills('$CLAWCODE_DIR/skills')
+if not skills:
+    print('  No skills installed.')
+    sys.exit(0)
+
+for s in skills:
+    eligible = check_eligible(s)
+    ns = _get_skill_metadata(s.metadata)
+    source = 'clawdbot' if s.metadata.get('clawdbot') else 'clawcode'
+    status = 'ready' if eligible else 'unavailable'
+    emoji = ns.get('emoji', '')
+    desc = s.description.split(chr(10))[0][:60] if s.description else '(no description)'
+    print(f'  {emoji + \" \" if emoji else \"\"}{s.name:20s}  [{status:12s}]  ({source})  {desc}')
+"
+            ;;
+        install)
+            if [ $# -eq 0 ]; then
+                echo "Usage: clawcode skill install <name>" >&2
+                exit 1
+            fi
+            if command -v clawdhub >/dev/null 2>&1; then
+                exec clawdhub install --workdir "$CLAWCODE_DIR" "$@"
+            else
+                echo "Error: clawdhub CLI not found" >&2
+                echo "Install it with: pip install clawdhub" >&2
+                exit 1
+            fi
+            ;;
+        search)
+            if [ $# -eq 0 ]; then
+                echo "Usage: clawcode skill search <query>" >&2
+                exit 1
+            fi
+            if command -v clawdhub >/dev/null 2>&1; then
+                exec clawdhub search "$@"
+            else
+                echo "Error: clawdhub CLI not found" >&2
+                echo "Install it with: pip install clawdhub" >&2
+                exit 1
+            fi
+            ;;
+        *)
+            echo "Unknown skill command: $subcmd" >&2
+            echo "Usage: clawcode skill <list|install|search>" >&2
+            exit 1
+            ;;
+    esac
 
 elif [ "$1" = "schedule" ]; then
     shift
@@ -130,9 +217,19 @@ elif [ "$1" = "restart" ]; then
 elif [ "$1" = "--continue" ]; then
     # Resume last session
     shift
-    exec "$CLAUDE" --continue --add-dir "$VAULT" "$@"
+    CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
+    if [ -n "$CONTEXT" ]; then
+        exec "$CLAUDE" --continue --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
+    else
+        exec "$CLAUDE" --continue --add-dir "$VAULT" "$@"
+    fi
 
 else
     # One-shot query
-    exec "$CLAUDE" --print --add-dir "$VAULT" -p "$*"
+    CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
+    if [ -n "$CONTEXT" ]; then
+        exec "$CLAUDE" --print --add-dir "$VAULT" --append-system-prompt "$CONTEXT" -p "$*"
+    else
+        exec "$CLAUDE" --print --add-dir "$VAULT" -p "$*"
+    fi
 fi

@@ -1,10 +1,16 @@
-"""SKILL.md loader — parse, match, and format skills for prompt injection."""
+"""SKILL.md loader — parse, gate, and format skills for prompt injection.
+
+Supports both ClawCode and Clawdbot/ClewHub metadata namespaces.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
+import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,17 +30,40 @@ class Skill:
     user_invocable: bool = False
 
 
+def _get_skill_metadata(raw_metadata: dict) -> dict:
+    """Extract skill metadata from either clawcode or clawdbot namespace.
+
+    Checks metadata.clawcode first, then metadata.clawdbot as fallback.
+    Returns the namespace dict (requires, os, emoji, etc.) or empty dict.
+    """
+    if not isinstance(raw_metadata, dict):
+        return {}
+    # Prefer clawcode namespace
+    ns = raw_metadata.get("clawcode")
+    if isinstance(ns, dict):
+        return ns
+    # Fall back to clawdbot namespace
+    ns = raw_metadata.get("clawdbot")
+    if isinstance(ns, dict):
+        return ns
+    return {}
+
+
 def parse_skill(path: Path) -> Skill | None:
     """Parse a SKILL.md file into a Skill object.
 
-    Expected format:
-    ---
-    name: skill-name
-    description: When to use this skill.
-    allowed-tools: Bash(tool:*), Read, Edit
-    metadata: {...}
-    ---
-    # Markdown body
+    Supports two formats:
+    1. YAML frontmatter (standard):
+       ---
+       name: skill-name
+       description: When to use this skill.
+       allowed-tools: Bash(tool:*), Read, Edit
+       metadata: {...}
+       ---
+       # Markdown body
+
+    2. No frontmatter (fallback):
+       Derives name from directory, uses first heading as description.
     """
     try:
         text = path.read_text(encoding="utf-8")
@@ -42,28 +71,41 @@ def parse_skill(path: Path) -> Skill | None:
         logger.warning("Cannot read skill %s: %s", path, e)
         return None
 
-    # Split YAML frontmatter from body
+    # Try to split YAML frontmatter from body
     parts = text.split("---", 2)
-    if len(parts) < 3:
-        logger.warning("Skill %s has no YAML frontmatter", path)
-        return None
+    if len(parts) >= 3 and parts[0].strip() == "":
+        # Has frontmatter
+        try:
+            fm = yaml.safe_load(parts[1])
+        except yaml.YAMLError as e:
+            logger.warning("Bad YAML in skill %s: %s", path, e)
+            return None
 
-    try:
-        fm = yaml.safe_load(parts[1])
-    except yaml.YAMLError as e:
-        logger.warning("Bad YAML in skill %s: %s", path, e)
-        return None
+        if not isinstance(fm, dict):
+            logger.warning("Skill %s frontmatter is not a dict", path)
+            return None
 
-    if not isinstance(fm, dict):
-        logger.warning("Skill %s frontmatter is not a dict", path)
-        return None
+        name = fm.get("name", path.parent.name)
+        description = fm.get("description", "")
+        body = parts[2].strip()
+        metadata = fm.get("metadata", {})
+        allowed_tools = fm.get("allowed-tools", "")
+        user_invocable = fm.get("user-invocable", False)
+    else:
+        # No frontmatter — derive from content
+        name = path.parent.name
+        body = text.strip()
+        metadata = {}
+        allowed_tools = ""
+        user_invocable = False
 
-    name = fm.get("name", path.parent.name)
-    description = fm.get("description", "")
-    body = parts[2].strip()
-    metadata = fm.get("metadata", {})
-    allowed_tools = fm.get("allowed-tools", "")
-    user_invocable = fm.get("user-invocable", False)
+        # Extract description from first heading
+        description = ""
+        for line in text.splitlines():
+            line = line.strip()
+            if line.startswith("# "):
+                description = line[2:].strip()
+                break
 
     return Skill(
         name=name,
@@ -74,6 +116,54 @@ def parse_skill(path: Path) -> Skill | None:
         allowed_tools=allowed_tools,
         user_invocable=user_invocable,
     )
+
+
+def check_eligible(skill: Skill) -> bool:
+    """Check if a skill meets its requirements for the current platform.
+
+    Gates on:
+    - requires.bins: all listed binaries must be on PATH
+    - requires.env: all listed env vars must be set
+    - os: platform must match (darwin, linux, etc.)
+
+    Works with both metadata.clawcode and metadata.clawdbot namespaces.
+    """
+    ns = _get_skill_metadata(skill.metadata)
+    if not ns:
+        return True  # No metadata = no requirements = eligible
+
+    # OS platform filter
+    os_filter = ns.get("os")
+    if os_filter and isinstance(os_filter, list):
+        current_platform = sys.platform
+        if current_platform not in os_filter:
+            logger.debug(
+                "Skill %s skipped: platform %s not in %s",
+                skill.name, current_platform, os_filter,
+            )
+            return False
+
+    requires = ns.get("requires", {})
+    if not isinstance(requires, dict):
+        return True
+
+    # Binary requirements
+    bins = requires.get("bins", [])
+    if isinstance(bins, list):
+        for b in bins:
+            if not shutil.which(str(b)):
+                logger.debug("Skill %s skipped: binary %s not found", skill.name, b)
+                return False
+
+    # Environment variable requirements
+    env_vars = requires.get("env", [])
+    if isinstance(env_vars, list):
+        for var in env_vars:
+            if not os.environ.get(str(var)):
+                logger.debug("Skill %s skipped: env var %s not set", skill.name, var)
+                return False
+
+    return True
 
 
 def load_skills(skills_dir: str | Path) -> list[Skill]:
@@ -92,43 +182,6 @@ def load_skills(skills_dir: str | Path) -> list[Skill]:
 
     logger.info("Loaded %d skills from %s", len(skills), skills_dir)
     return skills
-
-
-def match_skills(message: str, skills: list[Skill]) -> list[Skill]:
-    """Match a user message against skill descriptions using keyword matching.
-
-    Looks for keywords from the skill description in the user message.
-    Returns skills sorted by match relevance (number of keyword hits).
-    """
-    message_lower = message.lower()
-    scored: list[tuple[int, Skill]] = []
-
-    for skill in skills:
-        desc_lower = skill.description.lower()
-
-        # Extract meaningful words from description (4+ chars to skip noise)
-        keywords = set(re.findall(r"\b[a-z]{4,}\b", desc_lower))
-
-        # Also extract quoted trigger phrases
-        quoted = re.findall(r'"([^"]+)"', skill.description)
-        phrases = [q.lower() for q in quoted]
-
-        # Score: phrase matches count more than individual keywords
-        score = 0
-        for phrase in phrases:
-            if phrase in message_lower:
-                score += 5
-
-        for kw in keywords:
-            if kw in message_lower:
-                score += 1
-
-        if score > 0:
-            scored.append((score, skill))
-
-    # Sort by score descending
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [s for _, s in scored]
 
 
 def _substitute_arguments(body: str, arguments: str) -> str:

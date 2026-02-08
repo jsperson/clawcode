@@ -16,6 +16,7 @@ import discord
 
 from .claude_bridge import ClaudeBridge
 from .config import Config
+from .context import build_context, write_cache
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,25 @@ def split_message(text: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Context cache management
+# ---------------------------------------------------------------------------
+
+# Module-level cached context — built once at startup, refreshed on file
+# changes or !reload. Avoids per-message disk reads.
+_cached_context: str | None = None
+
+
+def _refresh_context(config: Config) -> str:
+    """Rebuild context from disk, update in-memory cache and file cache."""
+    global _cached_context
+    context = build_context(config)
+    _cached_context = context
+    write_cache(config, context)
+    logger.info("Context cache refreshed (%d chars)", len(context))
+    return context
+
+
+# ---------------------------------------------------------------------------
 # Bot setup
 # ---------------------------------------------------------------------------
 
@@ -104,6 +124,10 @@ def create_bot(config: Config) -> discord.Client:
     async def on_ready() -> None:
         logger.info("ClawCode bot connected as %s", client.user)
         _update_bot_state(config, "bot_started_at")
+
+        # Build and cache context at startup
+        _refresh_context(config)
+
         try:
             from .memory import append_daily_log
             append_daily_log(config, "Bot startup (graceful)")
@@ -173,13 +197,19 @@ def create_bot(config: Config) -> discord.Client:
             await _shutdown()
             return
 
+        # Reload command — rebuild context cache without restarting
+        if user_text == "!reload":
+            logger.info("Reload requested by %s", message.author)
+            _refresh_context(config)
+            await message.channel.send("Context cache rebuilt.")
+            return
+
         logger.info("Message from %s: %s", message.author, user_text[:100])
 
         # Show typing indicator while Claude processes
         async with message.channel.typing():
             try:
-                # Build context from memory and skills if available
-                append_prompt = await _build_context(config, user_text)
+                append_prompt = _get_context(config)
 
                 response = await bridge.invoke(
                     message=user_text,
@@ -207,39 +237,107 @@ def create_bot(config: Config) -> discord.Client:
     return client
 
 
-async def _build_context(config: Config, user_message: str) -> str | None:
-    """Build the append-system-prompt context from memory and skills.
+def _get_context(config: Config) -> str | None:
+    """Return cached context for message handling.
 
-    Returns None if no context modules are available yet.
+    Uses in-memory cache (no disk reads per message).
+    Falls back to rebuilding if cache is somehow empty.
     """
-    parts: list[str] = []
+    global _cached_context
+    if _cached_context:
+        return _cached_context
 
-    # Memory integration (Phase 3)
+    # Fallback: rebuild cache if it was never initialized
+    context = _refresh_context(config)
+    return context if context.strip() else None
+
+
+# ---------------------------------------------------------------------------
+# Context file watcher — watches SKILL.md, IDENTITY.md, USER.md
+# ---------------------------------------------------------------------------
+
+# Files that trigger a context cache refresh when modified
+_CONTEXT_WATCH_PATTERNS = {"SKILL.md", "IDENTITY.md", "USER.md"}
+
+
+def _start_context_watcher(client: discord.Client) -> None:
+    """Start a watchdog observer for context-relevant files.
+
+    Watches skills dir + project root for changes to SKILL.md, IDENTITY.md,
+    USER.md. Triggers context cache rebuild on changes.
+    """
     try:
-        from .memory import read_memory, read_daily_log
-
-        mem = read_memory(config)
-        if mem:
-            parts.append(f"## Memory\n{mem}")
-        daily = read_daily_log(config)
-        if daily:
-            parts.append(f"## Today's Log\n{daily}")
+        from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent, FileDeletedEvent
+        from watchdog.observers import Observer
     except ImportError:
-        pass
+        logger.debug("watchdog not available for context watcher")
+        return
 
-    # Skill integration (Phase 4)
-    try:
-        from skills.loader import load_skills, match_skills, format_skill_context
+    config: Config = client.config  # type: ignore[attr-defined]
+    loop = asyncio.get_event_loop()
 
-        all_skills = load_skills(config.paths.skills_dir)
-        matched = match_skills(user_message, all_skills)
-        if matched:
-            skill_ctx = format_skill_context(matched)
-            parts.append(skill_ctx)
-    except ImportError:
-        pass
+    class ContextFileHandler(FileSystemEventHandler):
+        def __init__(self) -> None:
+            self._debounce_timer: asyncio.TimerHandle | None = None
 
-    return "\n\n".join(parts) if parts else None
+        def _should_handle(self, path: str) -> bool:
+            name = Path(path).name
+            return name in _CONTEXT_WATCH_PATTERNS
+
+        def on_modified(self, event: FileModifiedEvent) -> None:  # type: ignore[override]
+            if event.is_directory or not self._should_handle(event.src_path):
+                return
+            self._schedule_refresh(event.src_path)
+
+        def on_created(self, event: FileCreatedEvent) -> None:  # type: ignore[override]
+            if event.is_directory or not self._should_handle(event.src_path):
+                return
+            self._schedule_refresh(event.src_path)
+
+        def on_deleted(self, event: FileDeletedEvent) -> None:  # type: ignore[override]
+            if event.is_directory or not self._should_handle(event.src_path):
+                return
+            self._schedule_refresh(event.src_path)
+
+        def _schedule_refresh(self, path: str) -> None:
+            """Debounced context refresh — wait 2s after last change."""
+            logger.info("Context file changed: %s — scheduling cache rebuild", Path(path).name)
+            loop.call_soon_threadsafe(self._do_schedule)
+
+        def _do_schedule(self) -> None:
+            if self._debounce_timer:
+                self._debounce_timer.cancel()
+            self._debounce_timer = loop.call_later(2.0, self._do_refresh)
+
+        def _do_refresh(self) -> None:
+            _refresh_context(config)
+            logger.info("Context cache rebuilt due to file change")
+
+    handler = ContextFileHandler()
+    observer = Observer()
+
+    # Watch skills directory (recursive — catches skills/*/SKILL.md)
+    skills_dir = Path(config.paths.skills_dir)
+    if skills_dir.is_dir():
+        observer.schedule(handler, str(skills_dir), recursive=True)
+
+    # Watch project root for IDENTITY.md, USER.md
+    project_dir = Path(config.paths.project_dir)
+    if project_dir.is_dir():
+        observer.schedule(handler, str(project_dir), recursive=False)
+
+    observer.daemon = True
+    observer.start()
+    logger.info("Context file watcher started (skills + identity)")
+
+    # Store reference for cleanup — append to existing observer list
+    existing = getattr(client, "_context_observer", None)
+    if existing:
+        try:
+            existing.stop()
+        except Exception:
+            pass
+    client._context_observer = observer  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
@@ -285,13 +383,16 @@ def main() -> None:
         # Schedules run via launchd — no in-process scheduler needed.
         # Edit config/schedules.yaml and run scripts/schedule-sync.py to sync.
 
-        # Phase 7: File watcher
+        # File watcher for vault/config files
         try:
             from .file_watcher import start_file_watcher
             start_file_watcher(client)
             logger.info("File watcher started")
         except ImportError:
             logger.debug("File watcher not yet available")
+
+        # Context file watcher for SKILL.md, IDENTITY.md, USER.md
+        _start_context_watcher(client)
 
         # Register SIGTERM handler for graceful shutdown (launchd sends SIGTERM)
         loop = asyncio.get_running_loop()
