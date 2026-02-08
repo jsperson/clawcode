@@ -134,9 +134,24 @@ def create_bot(config: Config) -> discord.Client:
         except ImportError:
             pass
 
+        # Notify Discord channel
+        try:
+            channel = await client.fetch_channel(config.discord.channel_id)
+            await channel.send("\U0001f7e2 Online.")
+        except Exception:
+            logger.exception("Error sending startup message")
+
     async def _shutdown() -> None:
         """Run cleanup before the bot process exits."""
         logger.info("Bot shutting down — running cleanup")
+
+        # 0. Notify Discord channel before closing
+        try:
+            if not client.is_closed():
+                channel = await client.fetch_channel(config.discord.channel_id)
+                await channel.send("\U0001f534 Going offline.")
+        except Exception:
+            logger.exception("Error sending shutdown message")
 
         # 1. Stop file watcher
         observer = getattr(client, "_file_observer", None)

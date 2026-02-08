@@ -19,6 +19,9 @@ data/sessions.json
 data/memory.db
 data/.mcp-config.json
 
+# Compiled binaries
+bin/
+
 # macOS
 .DS_Store
 

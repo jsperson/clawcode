@@ -98,7 +98,19 @@ echo "→ Creating directories..."
 mkdir -p data/logs memory/templates skills
 
 # ---------------------------------------------------------------------------
-# 7. Symlink CLI wrapper
+# 7. Compile clawcal (EventKit calendar CLI)
+# ---------------------------------------------------------------------------
+echo "→ Compiling clawcal..."
+mkdir -p bin
+if swiftc -O scripts/clawcal.swift -o bin/clawcal 2>/dev/null; then
+    codesign -f -s - --identifier "com.clawcode.clawcal" bin/clawcal 2>/dev/null
+    echo "  Compiled bin/clawcal"
+else
+    echo "  ⚠️  clawcal compilation failed — calendar features will be unavailable"
+fi
+
+# ---------------------------------------------------------------------------
+# 8. Symlink CLI wrapper
 # ---------------------------------------------------------------------------
 echo "→ Setting up CLI..."
 mkdir -p "$HOME/bin"
@@ -120,12 +132,12 @@ if ! echo "$PATH" | grep -q "$HOME/bin"; then
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Make scripts executable
+# 9. Make scripts executable
 # ---------------------------------------------------------------------------
 chmod +x scripts/*.sh
 
 # ---------------------------------------------------------------------------
-# 8b. Install gmail-mcp npm package (if npm available)
+# 9b. Install gmail-mcp npm package (if npm available)
 # ---------------------------------------------------------------------------
 if command -v npm &>/dev/null; then
     if ! npm list -g gmail-mcp &>/dev/null 2>&1; then
@@ -135,7 +147,7 @@ if command -v npm &>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 9. Install launchd plists
+# 10. Install launchd plists
 # ---------------------------------------------------------------------------
 echo "→ Installing launchd services..."
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"

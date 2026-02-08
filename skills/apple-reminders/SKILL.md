@@ -3,13 +3,13 @@ name: apple-reminders
 description: Manage Apple Reminders — create, list, complete, and query tasks.
   Use when user asks to "remind me", "add a reminder", "what are my tasks",
   "show reminders", "complete task", or discusses to-do items.
-allowed-tools: Bash(remindctl:*), Bash(icalpal:*)
+allowed-tools: Bash(remindctl:*)
 metadata:
   clawcode:
     emoji: "⏰"
     os: ["darwin"]
     requires:
-      bins: [remindctl, icalpal]
+      bins: [remindctl]
 ---
 
 # Apple Reminders CLI (remindctl)
@@ -98,23 +98,9 @@ Accepted by `--due` and date filters:
 - `YYYY-MM-DD HH:mm` (e.g., `2026-02-15 14:00`)
 - ISO 8601 (`2026-02-15T14:00:00Z`)
 
-## Calendar Queries (icalpal)
+## Calendar Events
 
-For read-only calendar event queries, use `icalpal`:
-
-```bash
-# Today's events
-icalpal eventsToday
-
-# Next 7 days
-icalpal eventsToday+7
-
-# JSON output for parsing
-icalpal eventsToday -o json
-
-# Events with time and title
-icalpal eventsToday -o json | jq -r '.[] | "\(.sctime[11:16]) - \(.title)"'
-```
+For calendar event queries and creation, use `clawcal` (see the calendar skill).
 
 ## Tips
 
@@ -122,4 +108,4 @@ icalpal eventsToday -o json | jq -r '.[] | "\(.sctime[11:16]) - \(.title)"'
 - Use `jq` for filtering and formatting JSON results
 - When creating reminders, pick the most appropriate list from Scott's lists above
 - Default to "Home" list for general personal reminders
-- For morning briefings, combine `remindctl today` + `remindctl overdue` + `icalpal eventsToday`
+- For morning briefings, combine `remindctl today` + `remindctl overdue` + `clawcal events`
