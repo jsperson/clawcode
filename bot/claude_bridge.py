@@ -211,6 +211,9 @@ class ClaudeBridge:
 
         async with self._semaphore:
             env = os.environ.copy()
+            # Prepend bin/ so Claude finds clawcal and other compiled tools
+            bin_dir = str(Path(self.config.paths.project_dir) / "bin")
+            env["PATH"] = f"{bin_dir}:{env.get('PATH', '/usr/bin:/bin')}"
             for server in self.config.mcp.servers:
                 env.update(server.env)
 

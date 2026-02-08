@@ -104,55 +104,9 @@ fi
 # === COLLECT CALENDAR EVENTS (today) ===
 CALENDAR_LIST=""
 CALENDAR_COUNT=0
-if command -v icalpal &> /dev/null; then
-  # icalpal reads Calendar.sqlitedb directly, requiring Full Disk Access.
-  # When run from the bot (python in process chain), FDA is blocked by
-  # a system TCC deny entry. Work around by spawning icalpal via a
-  # launchd one-shot job so the process chain is launchd→bash→icalpal
-  # with no python ancestor.
-  ICAL_OUT=$(mktemp /tmp/clawcode-ical-XXXXXX.json)
-  ICAL_PLIST=$(mktemp /tmp/clawcode-ical-XXXXXX.plist)
-  ICAL_LABEL="com.clawcode.icalpal.$$"
-  cat > "$ICAL_PLIST" << PLISTEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>$ICAL_LABEL</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>-c</string>
-        <string>icalpal eventsToday -o json > $ICAL_OUT 2>/dev/null</string>
-    </array>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-        <key>HOME</key>
-        <string>/Users/jsperson</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-PLISTEOF
-  launchctl bootstrap gui/$(id -u) "$ICAL_PLIST" 2>/dev/null
-  # Wait for the job to finish (icalpal runs in ~100ms)
-  for i in $(seq 1 20); do
-    launchctl print gui/$(id -u)/"$ICAL_LABEL" >/dev/null 2>&1 || break
-    sleep 0.25
-  done
-  launchctl bootout gui/$(id -u)/"$ICAL_LABEL" 2>/dev/null
-  rm -f "$ICAL_PLIST"
-
-  if [ -s "$ICAL_OUT" ]; then
-    calendar_json=$(cat "$ICAL_OUT")
-  else
-    calendar_json="[]"
-  fi
-  rm -f "$ICAL_OUT"
+CLAWCAL="$SCRIPT_DIR/../bin/clawcal"
+if [ -x "$CLAWCAL" ]; then
+  calendar_json=$("$CLAWCAL" events --exclude "Birthdays,Found in Natural Language" 2>/dev/null || echo "[]")
 
   while IFS= read -r event; do
     if [ -n "$event" ] && [ "$event" != "null" ]; then
@@ -160,10 +114,10 @@ PLISTEOF
       CALENDAR_LIST="$CALENDAR_LIST
 $event"
     fi
-  done < <(echo "$calendar_json" | jq -r '.[] | select(.calendar != "Found in Natural Language") | "- **\(.sctime[11:16])** \(.title)"' 2>/dev/null)
+  done < <(echo "$calendar_json" | jq -r '.[] | "- **\(.start // "all day")** \(.title)"' 2>/dev/null)
 else
   CALENDAR_LIST="
-- icalpal not installed"
+- clawcal not compiled (run scripts/install.sh)"
 fi
 
 # === GENERATE DIGEST FILE ===

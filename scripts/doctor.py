@@ -93,6 +93,17 @@ def check_discord_env() -> bool:
     )
 
 
+def _find_bin(name: str) -> str | None:
+    """Find a binary on PATH or in PROJECT_DIR/bin."""
+    found = shutil.which(name)
+    if found:
+        return found
+    local = PROJECT_DIR / "bin" / name
+    if local.exists() and os.access(local, os.X_OK):
+        return str(local)
+    return None
+
+
 def check_skill_bins() -> list[bool]:
     """Scan skills/*/SKILL.md for required binaries."""
     results = []
@@ -104,13 +115,13 @@ def check_skill_bins() -> list[bool]:
         skill_name = skill_md.parent.name
         bins = _parse_required_bins(skill_md)
         for b in bins:
-            found = shutil.which(b) is not None
+            found = _find_bin(b)
             results.append(check(
                 f"Skill [{skill_name}] bin: {b}",
-                found,
-                shutil.which(b) or "found",
+                found is not None,
+                found or "found",
                 "not found",
-                fix=f"brew install {b}",
+                fix=f"Run scripts/install.sh" if b == "clawcal" else f"brew install {b}",
             ))
     return results
 
@@ -246,127 +257,39 @@ def check_macos_reminders() -> bool:
                       fix="Run 'remindctl authorize' from Terminal.app", warn=True)
 
 
-def check_icalpal_calendar() -> bool:
-    """Check if icalpal can read Calendar via one-shot launchd job.
-
-    icalpal reads Calendar.sqlitedb directly, which requires Full Disk Access.
-    python3.13 has an explicit FDA DENY in the system TCC database (SIP-protected),
-    so any process with python as an ancestor is blocked. The bot works around this
-    by spawning icalpal via a one-shot launchd job (no python in the chain).
-
-    This check validates that the one-shot approach works.
-    """
-    if not shutil.which("icalpal"):
-        return True  # Skip if not installed (already flagged by skill check)
-
-    import tempfile
-
-    uid = os.getuid()
-    label = f"com.clawcode.doctor.icalpal.{os.getpid()}"
+def check_clawcal() -> bool:
+    """Check if clawcal is compiled and has Calendar permission."""
+    clawcal = PROJECT_DIR / "bin" / "clawcal"
+    if not clawcal.exists():
+        return check(
+            "Calendar CLI (clawcal)",
+            False,
+            "",
+            "bin/clawcal not found",
+            fix="Run scripts/install.sh to compile clawcal",
+        )
 
     try:
-        # Create temp files for output and plist
-        out_fd, out_path = tempfile.mkstemp(prefix="clawcode-doctor-ical-", suffix=".json")
-        os.close(out_fd)
-        plist_fd, plist_path = tempfile.mkstemp(prefix="clawcode-doctor-ical-", suffix=".plist")
-
-        plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>{label}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>-c</string>
-        <string>icalpal eventsToday -o json > {out_path} 2>/tmp/clawcode-doctor-ical-err.log</string>
-    </array>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-        <key>HOME</key>
-        <string>{Path.home()}</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-"""
-        with os.fdopen(plist_fd, "w") as f:
-            f.write(plist_content)
-
-        # Bootstrap the one-shot job
-        subprocess.run(
-            ["launchctl", "bootstrap", f"gui/{uid}", plist_path],
-            capture_output=True, timeout=5,
+        result = subprocess.run(
+            [str(clawcal), "calendars"],
+            capture_output=True, text=True, timeout=10,
         )
-
-        # Wait for it to finish (icalpal runs in ~100ms)
-        import time
-        for _ in range(20):
-            r = subprocess.run(
-                ["launchctl", "print", f"gui/{uid}/{label}"],
-                capture_output=True, timeout=5,
-            )
-            if r.returncode != 0:
-                break
-            time.sleep(0.25)
-
-        # Clean up the launchd job
-        subprocess.run(
-            ["launchctl", "bootout", f"gui/{uid}/{label}"],
-            capture_output=True, timeout=5,
-        )
-        os.unlink(plist_path)
-
-        # Check if icalpal produced valid output
-        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
-            content = Path(out_path).read_text().strip()
-            os.unlink(out_path)
-            # Valid JSON output means it worked (even "[]" is fine)
-            ok = content.startswith("[") or content.startswith("{")
-            return check(
-                "Calendar access (icalpal)",
-                ok,
-                "authorized (via launchd one-shot)",
-                "icalpal ran but returned invalid data",
-                fix="Grant Full Disk Access to Python.app in System Settings → Privacy & Security → Full Disk Access",
-                warn=True,
-            )
-        else:
-            if os.path.exists(out_path):
-                os.unlink(out_path)
-            # Check error log
-            err_path = Path("/tmp/clawcode-doctor-ical-err.log")
-            err_msg = "empty output — likely FDA denied"
-            if err_path.exists():
-                err_text = err_path.read_text().strip()
-                if "not permitted" in err_text.lower() or "not open" in err_text.lower():
-                    err_msg = "FDA denied — cannot open Calendar.sqlitedb"
-                err_path.unlink(missing_ok=True)
-            return check(
-                "Calendar access (icalpal)",
-                False,
-                "",
-                err_msg,
-                fix="Grant Full Disk Access to Python.app in System Settings → Privacy & Security → Full Disk Access",
-            )
-
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        # Clean up on error
-        for p in [out_path, plist_path]:
-            try:
-                os.unlink(p)
-            except (NameError, OSError):
-                pass
+        ok = result.returncode == 0 and result.stdout.strip().startswith("[")
         return check(
-            "Calendar access (icalpal)",
+            "Calendar access (clawcal)",
+            ok,
+            "authorized",
+            result.stderr.strip() or "no calendar data returned",
+            fix="Run bin/clawcal calendars from Terminal and grant Calendar access when prompted",
+            warn=True,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        return check(
+            "Calendar access (clawcal)",
             False,
             "",
             f"check failed: {e}",
-            fix="Ensure launchctl is available and user session is active",
+            fix="Run scripts/install.sh to compile clawcal",
             warn=True,
         )
 
@@ -586,7 +509,7 @@ def main():
 
     section("macOS Permissions")
     all_ok &= check_macos_reminders()
-    all_ok &= check_icalpal_calendar()
+    all_ok &= check_clawcal()
 
     section("Environment")
     all_ok &= check_venv()
