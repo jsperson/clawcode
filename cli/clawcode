@@ -29,9 +29,9 @@ if [ $# -eq 0 ]; then
     # Interactive session
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        exec "$CLAUDE" --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
+        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
     else
-        exec "$CLAUDE" --add-dir "$VAULT"
+        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT"
     fi
 
 elif [ "$1" = "doctor" ]; then
@@ -219,17 +219,17 @@ elif [ "$1" = "--continue" ]; then
     shift
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        exec "$CLAUDE" --continue --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
+        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
     else
-        exec "$CLAUDE" --continue --add-dir "$VAULT" "$@"
+        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" "$@"
     fi
 
 else
     # One-shot query
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        exec "$CLAUDE" --print --add-dir "$VAULT" --append-system-prompt "$CONTEXT" -p "$*"
+        exec "$CLAUDE" --print --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT" -p "$*"
     else
-        exec "$CLAUDE" --print --add-dir "$VAULT" -p "$*"
+        exec "$CLAUDE" --print --dangerously-skip-permissions --add-dir "$VAULT" -p "$*"
     fi
 fi
