@@ -1,9 +1,4 @@
 schedules:
-  morning_briefing:
-    cron: "0 8 * * *"
-    prompt: "Morning briefing: today's calendar, reminders due, inbox items, yesterday's summary"
-    enabled: true
-
   inbox_check:
     cron: "*/30 * * * *"
     prompt: "/process-inbox"
