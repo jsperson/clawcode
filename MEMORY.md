@@ -124,12 +124,17 @@ Schedules are macOS launchd agents, independent of the Discord bot process.
 
 ## Planned Features
 
-### Memory Search
+### Memory Search (separate project)
 Replace bulk memory injection with on-demand search. Index MEMORY.md + memory/*.md with hybrid BM25 + vector search (SQLite). Provide memory_search + memory_get tools to Claude. System prompt instructs Claude to search before answering questions about history/preferences.
 
 ---
 
 ## Completed Features
+
+### Background Startup — 2026-02-08
+- Bot runs as launchd agent (`com.clawcode.bot`) with `KeepAlive` + `RunAtLoad`
+- Launches via `ClawCode.app` bundle for stable macOS TCC bundle ID
+- `install.sh` re-bootstraps agents after copying plists (no more dead bot after install)
 
 ### ClewHub Skill Compatibility + Unified Context Layer — 2026-02-07
 - `bot/context.py` — unified context builder assembles identity + user + skill summaries, writes `data/context.cache`
