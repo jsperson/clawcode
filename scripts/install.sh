@@ -149,6 +149,7 @@ for plist in launchd/*.plist; do
     launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
 
     cp "$plist" "$LAUNCH_AGENTS/$name"
+    launchctl bootstrap "gui/$(id -u)" "$LAUNCH_AGENTS/$name" 2>/dev/null || true
     echo "  Installed $name"
 done
 
