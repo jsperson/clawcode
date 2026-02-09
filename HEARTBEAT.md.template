@@ -1,0 +1,14 @@
+# Heartbeat Tasks
+
+Tasks and processes to check each heartbeat cycle (every 30 minutes).
+Execute each active task below, then report status.
+
+## Active Tasks
+
+<!-- Add tasks here. Examples:
+- Check AAPL stock price and report if it moved more than 2% today
+- Verify the daily-digest schedule ran successfully
+- Check if a specific file has been updated
+-->
+
+None currently active.
