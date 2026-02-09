@@ -35,10 +35,16 @@ cd /Users/jsperson/clawcode/scripts && python3 -m canvas_cli
 
 ## Output
 
-All commands output JSON to stdout. Parse with `jq`:
+All commands output JSON to stdout. **Use Python for JSON filtering** (not jq — bash history expansion mangles `!=` in jq expressions):
 
 ```bash
-canvas-cli.py upcoming | jq -r '.[] | "\(.due_at) - \(.name)"'
+canvas-cli.py upcoming --days=14 | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for a in sorted((x for x in data if x.get('due_at')), key=lambda x: x['due_at']):
+    status = 'submitted' if a.get('submitted') else 'DUE'
+    print(f\"{a['due_at'][:10]}  {a['course_name']}: {a['name']}  [{status}]\")
+"
 ```
 
 Write operations output JSON with an `"action"` key:
@@ -267,17 +273,31 @@ canvas-cli.py search QUERY
 
 ### Daily Digest Integration
 ```bash
-canvas-cli.py upcoming --days=7 | jq -r '.[] | "- **\(.due_at[:10])** \(.course_name): \(.name)"'
+canvas-cli.py upcoming --days=7 | python3 -c "
+import json, sys
+for a in sorted(json.load(sys.stdin), key=lambda x: x.get('due_at') or ''):
+    if a.get('due_at'):
+        print(f\"- **{a['due_at'][:10]}** {a['course_name']}: {a['name']}\")
+"
 ```
 
 ### Check for New Announcements
 ```bash
-canvas-cli.py announcements --limit=5 | jq -r '.[] | "[\(.course_name)] \(.title)"'
+canvas-cli.py announcements --limit=5 | python3 -c "
+import json, sys
+for a in json.load(sys.stdin):
+    print(f\"[{a['course_name']}] {a['title']}\")
+"
 ```
 
 ### Grade Check
 ```bash
-canvas-cli.py grades | jq -r '.[] | "\(.course_name): \(.current_grade // .current_score // "N/A")"'
+canvas-cli.py grades | python3 -c "
+import json, sys
+for g in json.load(sys.stdin):
+    grade = g.get('current_grade') or g.get('current_score') or 'N/A'
+    print(f\"{g['course_name']}: {grade}\")
+"
 ```
 
 ### Submit Text Entry
@@ -307,5 +327,5 @@ canvas-cli.py delete-calendar-event 99999 -y
 
 - All datetimes formatted as "YYYY-MM-DD HH:MM" in local time
 - Courses filtered to active enrollments only
-- JSON output suitable for parsing with jq or Python
+- JSON output suitable for parsing with Python (avoid jq — bash `!` escaping breaks `!=` filters)
 - Package lives in `scripts/canvas_cli/` (importable as `canvas_cli`)

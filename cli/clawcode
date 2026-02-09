@@ -213,6 +213,10 @@ elif [ "$1" = "memory" ]; then
     shift
     exec "$VENV_PYTHON" -m bot.memory_search "$@"
 
+elif [ "$1" = "tui" ]; then
+    # TUI client — attach to gateway session, run claude interactively
+    exec "$VENV_PYTHON" "$CLAWCODE_DIR/cli/tui.py"
+
 elif [ "$1" = "restart" ]; then
     # Graceful restart via launchd — sends SIGTERM, then restarts
     echo "Restarting ClawCode bot..."
