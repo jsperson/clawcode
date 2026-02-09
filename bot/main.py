@@ -118,6 +118,7 @@ TEXT_EXTENSIONS = {
 }
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_ATTACHMENTS = 5
+ATTACHMENT_DIR = Path("/tmp/clawcode-attachments")
 
 
 def _detect_image_type(data: bytes) -> str | None:
@@ -134,7 +135,12 @@ def _detect_image_type(data: bytes) -> str | None:
 
 
 async def _download_attachments(discord_attachments: list) -> list[dict]:
-    """Download and encode Discord attachments for the gateway."""
+    """Download and encode Discord attachments for the gateway.
+
+    Images → base64 image content blocks.
+    Text files → base64 text content blocks (decoded by gateway).
+    Binary files (PDF, DOCX, etc.) → saved to /tmp, referenced as text block.
+    """
     results = []
     for att in discord_attachments[:MAX_ATTACHMENTS]:
         if att.size > MAX_FILE_SIZE:
@@ -145,9 +151,6 @@ async def _download_attachments(discord_attachments: list) -> list[dict]:
         ext = Path(att.filename).suffix.lower()
         is_image = content_type.startswith("image/")
         is_text = ext in TEXT_EXTENSIONS
-
-        if not is_image and not is_text:
-            continue
 
         try:
             data = await att.read()
@@ -160,15 +163,55 @@ async def _download_attachments(discord_attachments: list) -> list[dict]:
             if not detected:
                 continue  # not a valid image
             content_type = detected  # trust magic bytes over extension
+            results.append({
+                "filename": att.filename,
+                "content_type": content_type,
+                "data": base64.b64encode(data).decode("ascii"),
+            })
+        elif is_text:
+            results.append({
+                "filename": att.filename,
+                "content_type": "text/plain",
+                "data": base64.b64encode(data).decode("ascii"),
+            })
+        else:
+            # Binary file — save to /tmp and reference by path
+            saved = _save_attachment(att.filename, data)
+            if saved:
+                ref = f"[File saved: {saved}] — use your Read tool to access this file"
+                results.append({
+                    "filename": att.filename,
+                    "content_type": "text/plain",
+                    "data": base64.b64encode(ref.encode("utf-8")).decode("ascii"),
+                })
 
-        results.append({
-            "filename": att.filename,
-            "content_type": content_type if is_image else "text/plain",
-            "data": base64.b64encode(data).decode("ascii"),
-        })
         logger.info("Attachment: %s (%d bytes, %s)", att.filename, len(data), content_type)
 
     return results
+
+
+def _save_attachment(filename: str, data: bytes) -> str | None:
+    """Save a binary attachment to /tmp/clawcode-attachments/. Returns the path or None."""
+    try:
+        ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
+        # Sanitize filename — keep only the basename, no path traversal
+        safe_name = Path(filename).name
+        if not safe_name:
+            safe_name = "attachment"
+        dest = ATTACHMENT_DIR / safe_name
+        # Avoid collisions — append counter if file exists
+        if dest.exists():
+            stem = dest.stem
+            suffix = dest.suffix
+            i = 1
+            while dest.exists():
+                dest = ATTACHMENT_DIR / f"{stem}_{i}{suffix}"
+                i += 1
+        dest.write_bytes(data)
+        return str(dest)
+    except Exception:
+        logger.warning("Failed to save attachment: %s", filename)
+        return None
 
 
 # ---------------------------------------------------------------------------
