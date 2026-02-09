@@ -5,7 +5,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOURCE_DIR="$(dirname "$SCRIPT_DIR")"
 INSTALL_DIR="$HOME/clawcode"
-OPENCLAW_WORKSPACE="$HOME/openclaw/workspace"
 
 echo "=== ClawCode Installer ==="
 echo "Source:  $SOURCE_DIR"
@@ -19,6 +18,8 @@ if [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
     echo "→ Syncing project to $INSTALL_DIR..."
     mkdir -p "$INSTALL_DIR"
     rsync -a --exclude='.venv' --exclude='__pycache__' --exclude='.git' --exclude='.env' \
+        --exclude='config/schedules.yaml' \
+        --exclude='USER.md' --exclude='MEMORY.md' --exclude='HEARTBEAT.md' \
         "$SOURCE_DIR/" "$INSTALL_DIR/"
 else
     echo "→ Already at $INSTALL_DIR"
@@ -53,24 +54,16 @@ if [ ! -d .git ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Copy memory/identity files from OpenClaw (if they don't exist yet)
+# 4. Copy local config files from templates if missing
 # ---------------------------------------------------------------------------
-echo "→ Checking memory files..."
+echo "→ Checking local config files..."
 
-if [ -f "$OPENCLAW_WORKSPACE/MEMORY.md" ] && [ ! -f "$INSTALL_DIR/MEMORY.md.imported" ]; then
-    echo "  Note: MEMORY.md already created from plan. Skipping OpenClaw copy."
-    touch "$INSTALL_DIR/MEMORY.md.imported"
-fi
-
-if [ -f "$OPENCLAW_WORKSPACE/USER.md" ] && [ ! -f "$INSTALL_DIR/USER.md.imported" ]; then
-    echo "  Note: USER.md already created from plan. Skipping OpenClaw copy."
-    touch "$INSTALL_DIR/USER.md.imported"
-fi
-
-if [ -f "$OPENCLAW_WORKSPACE/IDENTITY.md" ] && [ ! -f "$INSTALL_DIR/IDENTITY.md.imported" ]; then
-    echo "  Note: IDENTITY.md already created from plan. Skipping OpenClaw copy."
-    touch "$INSTALL_DIR/IDENTITY.md.imported"
-fi
+for tmpl in USER.md MEMORY.md HEARTBEAT.md; do
+    if [ ! -f "$tmpl" ] && [ -f "${tmpl}.template" ]; then
+        echo "  Creating $tmpl from template..."
+        cp "${tmpl}.template" "$tmpl"
+    fi
+done
 
 # ---------------------------------------------------------------------------
 # 5. Create .env template if missing
@@ -89,6 +82,14 @@ GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 ENV
     echo "  ⚠️  Edit .env with your Discord credentials before starting the bot."
+fi
+
+# ---------------------------------------------------------------------------
+# 5b. Copy schedules.yaml from template if missing
+# ---------------------------------------------------------------------------
+if [ ! -f config/schedules.yaml ]; then
+    echo "→ Creating config/schedules.yaml from template..."
+    cp config/schedules.yaml.template config/schedules.yaml
 fi
 
 # ---------------------------------------------------------------------------

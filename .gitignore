@@ -11,6 +11,15 @@ build/
 .venv/
 venv/
 
+# Daily memory logs (runtime, not code)
+memory/*.md
+
+# Local config (created from .template on install)
+config/schedules.yaml
+USER.md
+MEMORY.md
+HEARTBEAT.md
+
 # Data and state
 data/state.json
 data/logs/
