@@ -66,6 +66,7 @@ class Session:
     last_activity: float
     message_count: int
     status: SessionStatus
+    attached_by: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -83,9 +84,11 @@ class SessionManager:
             str(self._db_path),
             isolation_level=None,  # autocommit
         )
+        self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         logger.info("Session database opened at %s", self._db_path)
 
     def close(self) -> None:
@@ -265,24 +268,81 @@ class SessionManager:
                 (session_id, limit),
             ).fetchall()
         return [
-            {"role": r[0], "content": r[1], "source": r[2], "timestamp": r[3]}
+            {"role": r["role"], "content": r["content"], "source": r["source"], "timestamp": r["timestamp"]}
             for r in rows
         ]
+
+    # -----------------------------------------------------------------------
+    # TUI attach/detach
+    # -----------------------------------------------------------------------
+
+    def attach_session(self, session_id: str, client_id: str) -> None:
+        """Mark a session as attached by a TUI client."""
+        self._conn.execute(
+            "UPDATE sessions SET attached_by = ?, last_activity = ? WHERE id = ?",
+            (client_id, time.time(), session_id),
+        )
+        logger.info("Session %s attached by client %s", session_id[:8], client_id[:8])
+
+    def detach_session(self, session_id: str, claude_session_id: str | None = None) -> None:
+        """Release a session from TUI attachment, optionally updating claude_session_id."""
+        if claude_session_id:
+            self._conn.execute(
+                "UPDATE sessions SET attached_by = NULL, claude_session_id = ?, last_activity = ? WHERE id = ?",
+                (claude_session_id, time.time(), session_id),
+            )
+        else:
+            self._conn.execute(
+                "UPDATE sessions SET attached_by = NULL, last_activity = ? WHERE id = ?",
+                (time.time(), session_id),
+            )
+        logger.info("Session %s detached", session_id[:8])
+
+    def detach_by_client(self, client_id: str) -> int:
+        """Detach all sessions attached by a given client. Returns count detached."""
+        now = time.time()
+        cursor = self._conn.execute(
+            "UPDATE sessions SET attached_by = NULL, last_activity = ? WHERE attached_by = ?",
+            (now, client_id),
+        )
+        count = cursor.rowcount
+        if count:
+            logger.info("Detached %d sessions from client %s", count, client_id[:8])
+        return count
+
+    def get_listable_sessions(self) -> list[Session]:
+        """Get all active/idle sessions suitable for TUI listing."""
+        rows = self._conn.execute(
+            "SELECT * FROM sessions WHERE status IN (?, ?) ORDER BY last_activity DESC",
+            (SessionStatus.ACTIVE.value, SessionStatus.IDLE.value),
+        ).fetchall()
+        return [self._row_to_session(r) for r in rows]
 
     # -----------------------------------------------------------------------
     # Internals
     # -----------------------------------------------------------------------
 
+    def _migrate(self) -> None:
+        """Run schema migrations for columns added after initial release."""
+        columns = {
+            row["name"]
+            for row in self._conn.execute("PRAGMA table_info(sessions)").fetchall()
+        }
+        if "attached_by" not in columns:
+            self._conn.execute("ALTER TABLE sessions ADD COLUMN attached_by TEXT")
+            logger.info("Migrated sessions table: added attached_by column")
+
     @staticmethod
-    def _row_to_session(row: tuple) -> Session:
+    def _row_to_session(row: sqlite3.Row) -> Session:
         return Session(
-            id=row[0],
-            client_type=ClientType(row[1]),
-            client_metadata=json.loads(row[2]) if row[2] else {},
-            claude_session_id=row[3],
-            claude_pid=row[4],
-            created_at=row[5],
-            last_activity=row[6],
-            message_count=row[7],
-            status=SessionStatus(row[8]),
+            id=row["id"],
+            client_type=ClientType(row["client_type"]),
+            client_metadata=json.loads(row["client_metadata"]) if row["client_metadata"] else {},
+            claude_session_id=row["claude_session_id"],
+            claude_pid=row["claude_pid"],
+            created_at=row["created_at"],
+            last_activity=row["last_activity"],
+            message_count=row["message_count"],
+            status=SessionStatus(row["status"]),
+            attached_by=row["attached_by"] if "attached_by" in row.keys() else None,
         )

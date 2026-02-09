@@ -46,7 +46,12 @@ class GatewayClient:
         """
         try:
             self._ws = await asyncio.wait_for(
-                websockets.connect(self._uri, ping_interval=20, ping_timeout=20),
+                websockets.connect(
+                    self._uri,
+                    ping_interval=20,
+                    ping_timeout=20,
+                    max_size=20_000_000,
+                ),
                 timeout=5,
             )
         except (OSError, asyncio.TimeoutError, Exception) as e:
@@ -101,12 +106,15 @@ class GatewayClient:
         self,
         channel_id: str,
         content: str,
+        attachments: list[dict] | None = None,
     ) -> str:
         """Send a message through the gateway and collect the full response.
 
         Args:
             channel_id: Discord channel ID (maps to a gateway session).
             content: The user's message text.
+            attachments: Optional list of attachment dicts with keys:
+                filename, content_type, data (base64-encoded).
 
         Returns:
             The complete assistant response text.
@@ -133,6 +141,7 @@ class GatewayClient:
             "type": "message",
             "session_id": session_id,
             "content": content,
+            "attachments": attachments or [],
         })
         await self._ws.send(msg)
 

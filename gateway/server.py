@@ -36,6 +36,7 @@ class GatewayServer:
             ping_interval=20,
             ping_timeout=20,
             close_timeout=5,
+            max_size=20_000_000,  # 20 MB — accommodate base64 image payloads
         )
         logger.info("Gateway WebSocket server listening on ws://%s:%d", self._host, self._port)
 
