@@ -211,7 +211,7 @@ class Config:
             reconnect_window_minutes=int(gw_raw.get("reconnect_window_minutes", 5)),
             claude_hang_timeout_seconds=int(gw_raw.get("claude_hang_timeout_seconds", 120)),
             auth_token=os.environ.get("GATEWAY_TOKEN", ""),
-            enabled=gw_raw.get("enabled", False),
+            enabled=os.environ.get("GATEWAY_ENABLED", str(gw_raw.get("enabled", False))).lower() in ("true", "1", "yes"),
         )
 
         return cls(
