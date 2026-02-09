@@ -172,12 +172,15 @@ class LifecycleEvent:
 
 def to_dict(msg: Any) -> dict[str, Any]:
     """Convert a protocol message to a JSON-serializable dict."""
+    import dataclasses
+
     result = {}
-    for k, v in msg.__dict__.items():
+    for f in dataclasses.fields(msg):
+        v = getattr(msg, f.name)
         if isinstance(v, Enum):
-            result[k] = v.value
+            result[f.name] = v.value
         else:
-            result[k] = v
+            result[f.name] = v
     return result
 
 
