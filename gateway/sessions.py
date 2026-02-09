@@ -268,7 +268,7 @@ class SessionManager:
                 (session_id, limit),
             ).fetchall()
         return [
-            {"role": r[0], "content": r[1], "source": r[2], "timestamp": r[3]}
+            {"role": r["role"], "content": r["content"], "source": r["source"], "timestamp": r["timestamp"]}
             for r in rows
         ]
 
@@ -297,6 +297,18 @@ class SessionManager:
                 (time.time(), session_id),
             )
         logger.info("Session %s detached", session_id[:8])
+
+    def detach_by_client(self, client_id: str) -> int:
+        """Detach all sessions attached by a given client. Returns count detached."""
+        now = time.time()
+        cursor = self._conn.execute(
+            "UPDATE sessions SET attached_by = NULL, last_activity = ? WHERE attached_by = ?",
+            (now, client_id),
+        )
+        count = cursor.rowcount
+        if count:
+            logger.info("Detached %d sessions from client %s", count, client_id[:8])
+        return count
 
     def get_listable_sessions(self) -> list[Session]:
         """Get all active/idle sessions suitable for TUI listing."""

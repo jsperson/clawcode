@@ -7,6 +7,7 @@ Handles streaming responses, broadcasting push events, and session lifecycle.
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import time
@@ -37,7 +38,7 @@ from .protocol import (
     parse_request,
     to_dict,
 )
-from .sessions import SessionManager
+from .sessions import Session, SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -93,14 +94,7 @@ class Router:
         """Remove a disconnected client. Auto-detaches any TUI-attached sessions."""
         client = self._clients.pop(client_id, None)
         if client:
-            # Auto-detach sessions this client had attached
-            for session in self._sessions.get_listable_sessions():
-                if session.attached_by == client_id:
-                    self._sessions.detach_session(session.id)
-                    logger.info(
-                        "Auto-detached session %s from disconnected client %s",
-                        session.id[:8], client_id[:8],
-                    )
+            self._sessions.detach_by_client(client_id)
             logger.info("Client disconnected: %s (type=%s)", client_id[:8],
                         client.client_type.value if client.client_type else "unknown")
 
@@ -131,7 +125,7 @@ class Router:
         elif isinstance(request, CancelRequest):
             await self._handle_cancel(client, request)
         elif isinstance(request, SessionList):
-            await self._handle_session_list(client)
+            await self._handle_session_list(client, request)
         elif isinstance(request, SessionAttach):
             await self._handle_session_attach(client, request)
         elif isinstance(request, SessionDetach):
@@ -144,13 +138,34 @@ class Router:
                 await client.send(msg)
 
     # -----------------------------------------------------------------------
+    # Helpers
+    # -----------------------------------------------------------------------
+
+    async def _get_session_or_error(self, client: Client, session_id: str) -> Session | None:
+        """Look up a session, sending an error to the client if not found."""
+        session = self._sessions.get_session(session_id)
+        if not session:
+            await client.send(ErrorEvent(
+                session_id=session_id,
+                code="session_not_found",
+                message="Session not found",
+            ))
+        return session
+
+    # -----------------------------------------------------------------------
     # Handlers
     # -----------------------------------------------------------------------
 
     async def _handle_auth(self, client: Client, req: AuthRequest) -> None:
-        if self._auth_token and req.token != self._auth_token:
+        if not self._auth_token:
+            await client.send(AuthError(message="Gateway has no auth token configured"))
+            logger.error("Auth rejected: GATEWAY_TOKEN is not set")
+            await client.ws.close()
+            return
+        if not hmac.compare_digest(req.token, self._auth_token):
             await client.send(AuthError(message="Invalid token"))
             logger.warning("Auth failed for client %s", client.client_id[:8])
+            await client.ws.close()
             return
 
         client.authenticated = True
@@ -171,13 +186,8 @@ class Router:
         await client.send(SessionCreated(session_id=session.id))
 
     async def _handle_session_resume(self, client: Client, req: SessionResume) -> None:
-        session = self._sessions.get_session(req.session_id)
+        session = await self._get_session_or_error(client, req.session_id)
         if not session:
-            await client.send(ErrorEvent(
-                session_id=req.session_id,
-                code="session_not_found",
-                message="Session not found",
-            ))
             return
 
         if session.status == SessionStatus.EXPIRED:
@@ -205,13 +215,8 @@ class Router:
             await client.send(ErrorEvent(code="no_session", message="No active session"))
             return
 
-        session = self._sessions.get_session(session_id)
+        session = await self._get_session_or_error(client, session_id)
         if not session:
-            await client.send(ErrorEvent(
-                session_id=session_id,
-                code="session_not_found",
-                message="Session not found",
-            ))
             return
 
         # Reject messages for sessions attached to a TUI client
@@ -227,7 +232,7 @@ class Router:
         lock = self._session_locks.setdefault(session_id, asyncio.Lock())
 
         async with lock:
-            await self._route_to_claude(client, session_id, session, req.content)
+            await self._route_to_claude(client, session_id, session, req.content, req.attachments)
 
     async def _handle_cancel(self, client: Client, req: CancelRequest) -> None:
         session_id = req.session_id or client.session_id
@@ -238,7 +243,7 @@ class Router:
     # TUI session management
     # -----------------------------------------------------------------------
 
-    async def _handle_session_list(self, client: Client) -> None:
+    async def _handle_session_list(self, client: Client, req: SessionList) -> None:
         sessions = self._sessions.get_listable_sessions()
         await client.send(SessionListOk(
             sessions=[
@@ -257,13 +262,8 @@ class Router:
         ))
 
     async def _handle_session_attach(self, client: Client, req: SessionAttach) -> None:
-        session = self._sessions.get_session(req.session_id)
+        session = await self._get_session_or_error(client, req.session_id)
         if not session:
-            await client.send(ErrorEvent(
-                session_id=req.session_id,
-                code="session_not_found",
-                message="Session not found",
-            ))
             return
 
         if session.attached_by and session.attached_by != client.client_id:
@@ -284,12 +284,16 @@ class Router:
         ))
 
     async def _handle_session_detach(self, client: Client, req: SessionDetach) -> None:
-        session = self._sessions.get_session(req.session_id)
+        session = await self._get_session_or_error(client, req.session_id)
         if not session:
+            return
+
+        # Only the attaching client (or an unattached session) can detach
+        if session.attached_by and session.attached_by != client.client_id:
             await client.send(ErrorEvent(
                 session_id=req.session_id,
-                code="session_not_found",
-                message="Session not found",
+                code="not_owner",
+                message="Session is attached to a different client",
             ))
             return
 
@@ -309,11 +313,16 @@ class Router:
         session_id: str,
         session: Any,
         content: str,
+        attachments: list[dict] | None = None,
     ) -> None:
         """Route a user message to the claude process and stream the response."""
-        # Record user message
+        # Record user message — text + attachment metadata, no base64 blobs
         source = client.client_type.value if client.client_type else "unknown"
-        self._sessions.add_message(session_id, "user", content, source)
+        history_content = content
+        for att in (attachments or []):
+            size_kb = len(att.get("data", "")) * 3 // 4 // 1024
+            history_content += f"\n[attachment: {att.get('filename', 'file')}, {size_kb}KB]"
+        self._sessions.add_message(session_id, "user", history_content, source)
 
         # Get or spawn claude process
         cp = self._pool.get_process(session_id)
@@ -341,7 +350,7 @@ class Router:
         # Send message to claude
         start = time.time()
         try:
-            await cp.send_message(content)
+            await cp.send_message(content, attachments=attachments)
         except RuntimeError as e:
             await client.send(ErrorEvent(
                 session_id=session_id,

@@ -9,10 +9,14 @@ from __future__ import annotations
 
 import json
 import os
-import signal
+import subprocess
 import sys
 import uuid
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from websockets.sync.client import ClientConnection
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -62,7 +66,11 @@ def get_token() -> str:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, _, v = line.partition("=")
-                    os.environ.setdefault(k.strip(), v.strip())
+                    v = v.strip()
+                    # Strip surrounding quotes (matches python-dotenv behavior)
+                    if len(v) >= 2 and v[0] == v[-1] and v[0] in ('"', "'"):
+                        v = v[1:-1]
+                    os.environ.setdefault(k.strip(), v)
     return os.environ.get("GATEWAY_TOKEN", "")
 
 
@@ -71,7 +79,7 @@ def get_token() -> str:
 # ---------------------------------------------------------------------------
 
 
-def gateway_connect(host: str, port: int, token: str):
+def gateway_connect(host: str, port: int, token: str) -> tuple[ClientConnection, str] | None:
     """Connect to gateway WebSocket, authenticate, return (ws, client_id).
 
     Returns None if gateway is unreachable.
@@ -94,7 +102,7 @@ def gateway_connect(host: str, port: int, token: str):
 
     try:
         raw = ws.recv(timeout=5)
-    except Exception:
+    except (TimeoutError, ConnectionError):
         ws.close()
         return None
 
@@ -107,7 +115,7 @@ def gateway_connect(host: str, port: int, token: str):
     return ws, data["client_id"]
 
 
-def list_sessions(ws) -> list[dict]:
+def list_sessions(ws: ClientConnection) -> list[dict]:
     """Request active/idle sessions from gateway."""
     ws.send(json.dumps({"type": "session.list"}))
     raw = ws.recv(timeout=5)
@@ -117,7 +125,7 @@ def list_sessions(ws) -> list[dict]:
     return []
 
 
-def create_session(ws) -> str | None:
+def create_session(ws: ClientConnection) -> str | None:
     """Create a new session, return session_id."""
     ws.send(json.dumps({"type": "session.create", "metadata": {"source": "tui"}}))
     raw = ws.recv(timeout=5)
@@ -128,7 +136,7 @@ def create_session(ws) -> str | None:
     return None
 
 
-def attach_session(ws, session_id: str) -> dict | None:
+def attach_session(ws: ClientConnection, session_id: str) -> dict | None:
     """Attach to a session, return {session_id, claude_session_id} or None."""
     ws.send(json.dumps({"type": "session.attach", "session_id": session_id}))
     raw = ws.recv(timeout=10)
@@ -139,7 +147,7 @@ def attach_session(ws, session_id: str) -> dict | None:
     return None
 
 
-def detach_session(ws, session_id: str, claude_session_id: str) -> None:
+def detach_session(ws: ClientConnection, session_id: str, claude_session_id: str) -> None:
     """Best-effort detach — don't fail if gateway is gone."""
     try:
         ws.send(json.dumps({
@@ -148,7 +156,7 @@ def detach_session(ws, session_id: str, claude_session_id: str) -> None:
             "claude_session_id": claude_session_id,
         }))
         ws.recv(timeout=3)
-    except Exception:
+    except (OSError, TimeoutError):
         pass
 
 
@@ -248,6 +256,7 @@ def main() -> None:
     session_id = None
     claude_session_id = None
     new_session_uuid = None
+    proc = None
 
     try:
         # List and pick session
@@ -293,8 +302,6 @@ def main() -> None:
         ws = None
 
         # Run claude interactively
-        import subprocess
-
         proc = subprocess.run(cmd)
 
         # Reconnect to gateway to report claude_session_id back
@@ -312,8 +319,12 @@ def main() -> None:
         if ws:
             try:
                 ws.close()
-            except Exception:
+            except OSError:
                 pass
+
+    # Propagate claude's exit code
+    if proc is not None:
+        sys.exit(proc.returncode)
 
 
 if __name__ == "__main__":
