@@ -19,7 +19,9 @@ def build_context(config: Config) -> str:
     """Build the full system prompt context from disk.
 
     Assembles:
-    - IDENTITY.md (static persona)
+    - SOUL.md (core philosophy and values)
+    - STYLE.md (voice and communication patterns)
+    - IDENTITY.md (external presentation)
     - USER.md (user profile)
     - Eligible skill names + descriptions (summary only, not full bodies)
 
@@ -27,7 +29,19 @@ def build_context(config: Config) -> str:
     """
     parts: list[str] = []
 
-    # Identity
+    # Soul — core philosophy (loaded first, most foundational)
+    soul_path = Path(config.paths.project_dir) / "SOUL.md"
+    soul = _read_file(soul_path)
+    if soul:
+        parts.append(f"## Soul\n{soul}")
+
+    # Style — voice and communication patterns
+    style_path = Path(config.paths.project_dir) / "STYLE.md"
+    style = _read_file(style_path)
+    if style:
+        parts.append(f"## Style\n{style}")
+
+    # Identity — external presentation
     identity_path = Path(config.paths.project_dir) / "IDENTITY.md"
     identity = _read_file(identity_path)
     if identity:

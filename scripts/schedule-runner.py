@@ -214,6 +214,7 @@ def post_to_discord(channel_id: str, message: str, bot_token: str) -> None:
     headers = {
         "Authorization": f"Bot {bot_token}",
         "Content-Type": "application/json",
+        "User-Agent": "ClawCode/1.0",
     }
 
     for chunk in split_message(message):
