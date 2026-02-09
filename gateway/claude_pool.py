@@ -39,6 +39,8 @@ class ClaudeProcess:
     message_count: int = 0
     _initialized: bool = False
 
+    _stderr_task: asyncio.Task | None = None
+
     @property
     def pid(self) -> int | None:
         return self.proc.pid
@@ -46,6 +48,24 @@ class ClaudeProcess:
     @property
     def alive(self) -> bool:
         return self.proc.returncode is None
+
+    def start_stderr_reader(self) -> None:
+        """Start a background task to log stderr from the claude process."""
+        if self.proc.stderr:
+            self._stderr_task = asyncio.create_task(self._read_stderr())
+
+    async def _read_stderr(self) -> None:
+        """Read and log stderr lines from the claude process."""
+        try:
+            while True:
+                line = await self.proc.stderr.readline()
+                if not line:
+                    break
+                text = line.decode("utf-8", errors="replace").strip()
+                if text:
+                    logger.warning("Claude pid=%s stderr: %s", self.pid, text[:500])
+        except Exception:
+            pass
 
     def _parse_init(self, line: str) -> str | None:
         """Parse the init message from claude, extract session_id. Returns session_id or None."""
@@ -58,11 +78,21 @@ class ClaudeProcess:
         return None
 
     async def send_message(self, content: str) -> None:
-        """Send a user message to the claude process via stdin."""
+        """Send a user message to the claude process via stdin.
+
+        Uses the Claude CLI stream-json input format:
+        {"type":"user","message":{"role":"user","content":[{"type":"text","text":"..."}]}}
+        """
         if not self.alive:
             raise RuntimeError(f"Claude process {self.pid} is not alive")
 
-        msg = json.dumps({"type": "user_message", "content": content})
+        msg = json.dumps({
+            "type": "user",
+            "message": {
+                "role": "user",
+                "content": [{"type": "text", "text": content}],
+            },
+        })
         self.proc.stdin.write((msg + "\n").encode("utf-8"))
         await self.proc.stdin.drain()
         self.message_count += 1
@@ -245,26 +275,11 @@ class ClaudePool:
         )
         self._processes[session_id] = cp
 
-        # Wait for init message (first JSON line on stdout)
-        try:
-            init_line = await asyncio.wait_for(
-                proc.stdout.readline(), timeout=30,
-            )
-            if init_line:
-                text = init_line.decode("utf-8", errors="replace").strip()
-                try:
-                    init_data = json.loads(text)
-                    if init_data.get("type") == "system" and init_data.get("subtype") == "init":
-                        cp.claude_session_id = init_data.get("session_id", "")
-                        cp._initialized = True
-                        logger.info(
-                            "Claude process pid=%s ready (claude_session=%s)",
-                            proc.pid, cp.claude_session_id[:8],
-                        )
-                except json.JSONDecodeError:
-                    logger.warning("Non-JSON init line from claude: %s", text[:200])
-        except asyncio.TimeoutError:
-            logger.warning("Claude process pid=%s did not produce init message within 30s", proc.pid)
+        # Note: Claude CLI stream-json mode only emits the init message
+        # after receiving the first user message, not at startup.
+        # The init message is captured in read_response().
+        cp.start_stderr_reader()
+        logger.info("Claude process pid=%s spawned", proc.pid)
 
         return cp
 
