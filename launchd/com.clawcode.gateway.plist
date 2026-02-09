@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.clawcode.gateway</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/jsperson/clawcode/ClawCodeGateway.app/Contents/MacOS/ClawCodeGateway</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/jsperson/clawcode</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/jsperson/clawcode/data/logs/gateway-stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/jsperson/clawcode/data/logs/gateway-stderr.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/jsperson/.npm-global/bin</string>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+</dict>
+</plist>

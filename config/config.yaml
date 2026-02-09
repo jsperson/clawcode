@@ -16,8 +16,20 @@ paths:
   memory_dir: ~/clawcode/memory
   data_dir: ~/clawcode/data
 
+gateway:
+  enabled: false                      # Feature flag: bot routes through gateway
+  host: 127.0.0.1
+  port: 7429
+  socket_path: data/gateway.sock
+  max_sessions: 5
+  max_claude_processes: 3
+  session_idle_timeout_minutes: 30
+  session_expiry_minutes: 120
+  reconnect_window_minutes: 5
+  claude_hang_timeout_seconds: 120
+
 file_watch:
-  enabled: true
+  enabled: false
   debounce_seconds: 5
   ignore_patterns: ["*.icloud", ".DS_Store", ".obsidian/*", "*~"]
   watches:

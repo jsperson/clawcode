@@ -111,6 +111,42 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 7b. Build gateway app bundle
+# ---------------------------------------------------------------------------
+echo "→ Building gateway app bundle..."
+GW_APP="$INSTALL_DIR/ClawCodeGateway.app/Contents/MacOS"
+mkdir -p "$GW_APP"
+cat > "$GW_APP/ClawCodeGateway" <<GWEOF
+#!/bin/bash
+# ClawCode Gateway launcher — .app bundle for stable macOS TCC permissions
+cd $INSTALL_DIR
+exec $INSTALL_DIR/.venv/bin/python -m gateway.main
+GWEOF
+chmod +x "$GW_APP/ClawCodeGateway"
+
+cat > "$INSTALL_DIR/ClawCodeGateway.app/Contents/Info.plist" <<GWPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.clawcode.gateway</string>
+    <key>CFBundleName</key>
+    <string>ClawCodeGateway</string>
+    <key>CFBundleExecutable</key>
+    <string>ClawCodeGateway</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>LSBackgroundOnly</key>
+    <true/>
+</dict>
+</plist>
+GWPLIST
+echo "  Built ClawCodeGateway.app"
+
+# ---------------------------------------------------------------------------
 # 8. Symlink CLI wrapper
 # ---------------------------------------------------------------------------
 echo "→ Setting up CLI..."

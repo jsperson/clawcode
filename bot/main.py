@@ -17,6 +17,7 @@ import discord
 from .claude_bridge import ClaudeBridge
 from .config import Config
 from .context import build_context, write_cache
+from .gateway_client import GatewayClient
 
 logger = logging.getLogger(__name__)
 
@@ -115,10 +116,19 @@ def create_bot(config: Config) -> discord.Client:
     intents.message_content = True
     client = discord.Client(intents=intents)
     bridge = ClaudeBridge(config)
+    gw_client: GatewayClient | None = None
+
+    if config.gateway.enabled:
+        gw_client = GatewayClient(
+            host=config.gateway.host,
+            port=config.gateway.port,
+            auth_token=config.gateway.auth_token,
+        )
 
     # Store references for later phases (scheduler, file watcher)
     client.config = config  # type: ignore[attr-defined]
     client.bridge = bridge  # type: ignore[attr-defined]
+    client.gw_client = gw_client  # type: ignore[attr-defined]
 
     @client.event
     async def on_ready() -> None:
@@ -133,6 +143,14 @@ def create_bot(config: Config) -> discord.Client:
             append_daily_log(config, "Bot startup (graceful)")
         except ImportError:
             pass
+
+        # Connect to gateway if enabled
+        if gw_client:
+            ok = await gw_client.connect()
+            if ok:
+                logger.info("Bot connected to gateway")
+            else:
+                logger.warning("Gateway connection failed — falling back to direct invocation")
 
         # Notify Discord channel
         try:
@@ -153,7 +171,14 @@ def create_bot(config: Config) -> discord.Client:
         except Exception:
             logger.exception("Error sending shutdown message")
 
-        # 1. Stop file watcher
+        # 1. Disconnect gateway client
+        if gw_client and gw_client.connected:
+            try:
+                await gw_client.disconnect()
+            except Exception:
+                logger.exception("Error disconnecting gateway client")
+
+        # 2. Stop file watcher
         observer = getattr(client, "_file_observer", None)
         if observer is not None:
             try:
@@ -163,24 +188,24 @@ def create_bot(config: Config) -> discord.Client:
             except Exception:
                 logger.exception("Error stopping file watcher")
 
-        # 2. Save sessions
+        # 3. Save sessions
         try:
             bridge.save_sessions()
         except Exception:
             logger.exception("Error saving sessions")
 
-        # 3. Append shutdown marker to daily log
+        # 4. Append shutdown marker to daily log
         try:
             from .memory import append_daily_log
             append_daily_log(config, "Bot shutdown (graceful)")
         except Exception:
             logger.exception("Error writing shutdown log")
 
-        # 4. Write bot_stopped_at to state.json
+        # 5. Write bot_stopped_at to state.json
         _update_bot_state(config, "bot_stopped_at")
         logger.info("Cleanup complete")
 
-        # 5. Close the Discord client
+        # 6. Close the Discord client
         if not client.is_closed():
             await client.close()
 
@@ -224,13 +249,19 @@ def create_bot(config: Config) -> discord.Client:
         # Show typing indicator while Claude processes
         async with message.channel.typing():
             try:
-                append_prompt = _get_context(config)
-
-                response = await bridge.invoke(
-                    message=user_text,
-                    channel_id=str(message.channel.id),
-                    append_prompt=append_prompt,
-                )
+                # Route through gateway if connected, otherwise fall back to direct
+                if gw_client and gw_client.connected:
+                    response = await gw_client.send_message(
+                        channel_id=str(message.channel.id),
+                        content=user_text,
+                    )
+                else:
+                    append_prompt = _get_context(config)
+                    response = await bridge.invoke(
+                        message=user_text,
+                        channel_id=str(message.channel.id),
+                        append_prompt=append_prompt,
+                    )
 
                 # Send response, splitting if needed
                 for chunk in split_message(response):

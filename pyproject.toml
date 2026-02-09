@@ -9,13 +9,14 @@ dependencies = [
     "python-dotenv>=1.0",
     "apscheduler>=3.10,<4",
     "watchdog>=4.0",
+    "websockets>=14.0",
 ]
 
 [project.scripts]
 clawcode-bot = "bot.main:main"
 
 [tool.setuptools.packages.find]
-include = ["bot*", "skills*"]
+include = ["bot*", "skills*", "gateway*"]
 
 [build-system]
 requires = ["setuptools>=68"]

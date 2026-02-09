@@ -26,6 +26,10 @@ data/logs/
 data/context.cache
 data/sessions.json
 data/memory.db
+data/gateway.db
+data/gateway.db-wal
+data/gateway.db-shm
+data/gateway.sock
 data/.mcp-config.json
 
 # Compiled binaries
