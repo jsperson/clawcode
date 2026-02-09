@@ -137,9 +137,10 @@ def _detect_image_type(data: bytes) -> str | None:
 async def _download_attachments(discord_attachments: list) -> list[dict]:
     """Download and encode Discord attachments for the gateway.
 
-    Images → base64 image content blocks.
+    Images → base64 image content blocks (inline, Claude sees them directly).
     Text files → base64 text content blocks (decoded by gateway).
-    Binary files (PDF, DOCX, etc.) → saved to /tmp, referenced as text block.
+    Everything else → saved to /tmp/clawcode-attachments/, referenced by path
+                      so Claude can access them with its Read tool.
     """
     results = []
     for att in discord_attachments[:MAX_ATTACHMENTS]:
