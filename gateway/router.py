@@ -22,8 +22,14 @@ from .protocol import (
     ErrorEvent,
     ResponseChunk,
     ResponseComplete,
+    SessionAttach,
+    SessionAttachOk,
     SessionCreate,
     SessionCreated,
+    SessionDetach,
+    SessionDetachOk,
+    SessionList,
+    SessionListOk,
     SessionResume,
     SessionResumed,
     SessionStatus,
@@ -84,9 +90,17 @@ class Router:
         return client
 
     def unregister_client(self, client_id: str) -> None:
-        """Remove a disconnected client."""
+        """Remove a disconnected client. Auto-detaches any TUI-attached sessions."""
         client = self._clients.pop(client_id, None)
         if client:
+            # Auto-detach sessions this client had attached
+            for session in self._sessions.get_listable_sessions():
+                if session.attached_by == client_id:
+                    self._sessions.detach_session(session.id)
+                    logger.info(
+                        "Auto-detached session %s from disconnected client %s",
+                        session.id[:8], client_id[:8],
+                    )
             logger.info("Client disconnected: %s (type=%s)", client_id[:8],
                         client.client_type.value if client.client_type else "unknown")
 
@@ -116,6 +130,12 @@ class Router:
             await self._handle_message(client, request)
         elif isinstance(request, CancelRequest):
             await self._handle_cancel(client, request)
+        elif isinstance(request, SessionList):
+            await self._handle_session_list(client)
+        elif isinstance(request, SessionAttach):
+            await self._handle_session_attach(client, request)
+        elif isinstance(request, SessionDetach):
+            await self._handle_session_detach(client, request)
 
     async def broadcast(self, msg: Any, exclude: str | None = None) -> None:
         """Send a message to all authenticated clients."""
@@ -194,6 +214,15 @@ class Router:
             ))
             return
 
+        # Reject messages for sessions attached to a TUI client
+        if session.attached_by:
+            await client.send(ErrorEvent(
+                session_id=session_id,
+                code="session_attached",
+                message="Session is attached to a TUI client",
+            ))
+            return
+
         # Per-session lock for message ordering
         lock = self._session_locks.setdefault(session_id, asyncio.Lock())
 
@@ -204,6 +233,71 @@ class Router:
         session_id = req.session_id or client.session_id
         if session_id:
             await self._pool.cancel(session_id)
+
+    # -----------------------------------------------------------------------
+    # TUI session management
+    # -----------------------------------------------------------------------
+
+    async def _handle_session_list(self, client: Client) -> None:
+        sessions = self._sessions.get_listable_sessions()
+        await client.send(SessionListOk(
+            sessions=[
+                {
+                    "id": s.id,
+                    "client_type": s.client_type.value,
+                    "claude_session_id": s.claude_session_id,
+                    "message_count": s.message_count,
+                    "status": s.status.value,
+                    "attached_by": s.attached_by,
+                    "last_activity": s.last_activity,
+                    "created_at": s.created_at,
+                }
+                for s in sessions
+            ],
+        ))
+
+    async def _handle_session_attach(self, client: Client, req: SessionAttach) -> None:
+        session = self._sessions.get_session(req.session_id)
+        if not session:
+            await client.send(ErrorEvent(
+                session_id=req.session_id,
+                code="session_not_found",
+                message="Session not found",
+            ))
+            return
+
+        if session.attached_by and session.attached_by != client.client_id:
+            await client.send(ErrorEvent(
+                session_id=req.session_id,
+                code="session_attached",
+                message="Session is already attached to another TUI client",
+            ))
+            return
+
+        # Kill gateway's claude process for this session — TUI will run its own
+        await self._pool.kill_session(req.session_id)
+
+        self._sessions.attach_session(req.session_id, client.client_id)
+        await client.send(SessionAttachOk(
+            session_id=session.id,
+            claude_session_id=session.claude_session_id or "",
+        ))
+
+    async def _handle_session_detach(self, client: Client, req: SessionDetach) -> None:
+        session = self._sessions.get_session(req.session_id)
+        if not session:
+            await client.send(ErrorEvent(
+                session_id=req.session_id,
+                code="session_not_found",
+                message="Session not found",
+            ))
+            return
+
+        self._sessions.detach_session(
+            req.session_id,
+            claude_session_id=req.claude_session_id or None,
+        )
+        await client.send(SessionDetachOk(session_id=session.id))
 
     # -----------------------------------------------------------------------
     # Claude routing

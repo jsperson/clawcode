@@ -79,6 +79,30 @@ class CancelRequest:
     session_id: str = ""
 
 
+@dataclass
+class SessionList:
+    """Client requests list of active/idle sessions."""
+
+    type: str = field(default="session.list", init=False)
+
+
+@dataclass
+class SessionAttach:
+    """TUI client claims a session — gateway kills its claude process."""
+
+    type: str = field(default="session.attach", init=False)
+    session_id: str = ""
+
+
+@dataclass
+class SessionDetach:
+    """TUI client releases a session, passes back claude_session_id."""
+
+    type: str = field(default="session.detach", init=False)
+    session_id: str = ""
+    claude_session_id: str = ""  # Updated ID from interactive claude run
+
+
 # ---------------------------------------------------------------------------
 # Gateway → Client messages
 # ---------------------------------------------------------------------------
@@ -158,6 +182,31 @@ class PushEvent:
 
 
 @dataclass
+class SessionListOk:
+    """Response with list of active/idle sessions."""
+
+    type: str = field(default="session.list.ok", init=False)
+    sessions: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class SessionAttachOk:
+    """Session successfully attached to TUI client."""
+
+    type: str = field(default="session.attach.ok", init=False)
+    session_id: str = ""
+    claude_session_id: str = ""
+
+
+@dataclass
+class SessionDetachOk:
+    """Session successfully detached from TUI client."""
+
+    type: str = field(default="session.detach.ok", init=False)
+    session_id: str = ""
+
+
+@dataclass
 class LifecycleEvent:
     """Gateway lifecycle event."""
 
@@ -191,10 +240,15 @@ _REQUEST_TYPES: dict[str, type] = {
     "session.resume": SessionResume,
     "message": UserMessage,
     "cancel": CancelRequest,
+    "session.list": SessionList,
+    "session.attach": SessionAttach,
+    "session.detach": SessionDetach,
 }
 
 
-def parse_request(data: dict[str, Any]) -> AuthRequest | SessionCreate | SessionResume | UserMessage | CancelRequest:
+def parse_request(
+    data: dict[str, Any],
+) -> AuthRequest | SessionCreate | SessionResume | UserMessage | CancelRequest | SessionList | SessionAttach | SessionDetach:
     """Parse a JSON dict into a typed request object.
 
     Raises:
