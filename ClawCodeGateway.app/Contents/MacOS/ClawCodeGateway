@@ -1,0 +1,4 @@
+#!/bin/bash
+# ClawCode Gateway launcher — .app bundle for stable macOS TCC permissions
+cd /Users/jsperson/clawcode
+exec /Users/jsperson/clawcode/.venv/bin/python -m gateway.main

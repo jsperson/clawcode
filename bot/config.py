@@ -81,6 +81,23 @@ class MCPConfig:
 
 
 @dataclass
+class GatewayConfig:
+    """Gateway process configuration (optional — only needed when gateway is running)."""
+
+    host: str = "127.0.0.1"
+    port: int = 7429
+    socket_path: str = "data/gateway.sock"
+    max_sessions: int = 5
+    max_claude_processes: int = 3
+    session_idle_timeout_minutes: int = 30
+    session_expiry_minutes: int = 120
+    reconnect_window_minutes: int = 5
+    claude_hang_timeout_seconds: int = 120
+    auth_token: str = ""
+    enabled: bool = False  # Feature flag: bot routes through gateway when True
+
+
+@dataclass
 class Config:
     discord: DiscordConfig
     claude: ClaudeConfig
@@ -88,6 +105,7 @@ class Config:
     paths: PathsConfig
     file_watch: FileWatchConfig
     mcp: MCPConfig = field(default_factory=MCPConfig)
+    gateway: GatewayConfig = field(default_factory=GatewayConfig)
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> Config:
@@ -180,6 +198,22 @@ class Config:
                     "Failed to parse mcp-servers.yaml: %s", e
                 )
 
+        # Gateway configuration (optional)
+        gw_raw = raw.get("gateway", {}) or {}
+        gateway = GatewayConfig(
+            host=gw_raw.get("host", "127.0.0.1"),
+            port=int(gw_raw.get("port", 7429)),
+            socket_path=gw_raw.get("socket_path", "data/gateway.sock"),
+            max_sessions=int(gw_raw.get("max_sessions", 5)),
+            max_claude_processes=int(gw_raw.get("max_claude_processes", 3)),
+            session_idle_timeout_minutes=int(gw_raw.get("session_idle_timeout_minutes", 30)),
+            session_expiry_minutes=int(gw_raw.get("session_expiry_minutes", 120)),
+            reconnect_window_minutes=int(gw_raw.get("reconnect_window_minutes", 5)),
+            claude_hang_timeout_seconds=int(gw_raw.get("claude_hang_timeout_seconds", 120)),
+            auth_token=os.environ.get("GATEWAY_TOKEN", ""),
+            enabled=gw_raw.get("enabled", False),
+        )
+
         return cls(
             discord=discord,
             claude=claude,
@@ -187,4 +221,5 @@ class Config:
             paths=paths,
             file_watch=file_watch,
             mcp=mcp,
+            gateway=gateway,
         )

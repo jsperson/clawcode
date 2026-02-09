@@ -197,6 +197,44 @@ Schedule runner is absorbed into the gateway:
 
 **Fallback:** Keep `scripts/schedule-runner.py` functional as a standalone fallback. If the gateway is down for extended maintenance, launchd can fire the runner directly.
 
+### macOS TCC (Transparency, Consent, and Control)
+
+The gateway inherits the same TCC constraints as the current bot. Key considerations:
+
+**Process chain and responsible process:**
+- Gateway runs as: `launchd → ClawCodeGateway.app → python (gateway) → claude (node) → bash → tools`
+- TCC grants tie to the "responsible process" (typically the app bundle or terminal app)
+- `python3.13` has an explicit FDA DENY in the system TCC database (SIP-protected, can't be removed)
+- Any process with python as an ancestor inherits the FDA denial for direct file-based access
+- claude (Node.js) is NOT python, so tools spawned by claude don't inherit the python FDA deny — but macOS may still check the ancestor chain
+
+**App bundle requirement:**
+- The gateway MUST launch through an app bundle (like the current `ClawCode.app` for the bot) to establish a stable TCC identity
+- Create `ClawCodeGateway.app` bundle wrapper, or reuse `ClawCode.app` with a mode flag
+- Without an app bundle, launchd-spawned processes get inconsistent TCC identities
+
+**Startup permission probes:**
+- On gateway startup, run diagnostic checks for TCC-gated services:
+  - `bin/clawcal calendars` — verifies Calendar access
+  - Other permission probes as skills require them
+- Log warnings (not errors) for missing grants — the gateway should still start
+- Surface results in `clawcode doctor`
+
+**Long-running session considerations:**
+- TCC grants can be revoked while a claude process is running (macOS update, user changes Privacy settings)
+- Tools that hit permission denials mid-session should return clear error messages, not crash the session
+- Gateway should catch permission-denied patterns in claude subprocess stderr and surface them to the client as actionable errors ("Calendar access denied — grant permission in System Settings > Privacy & Security > Calendar")
+
+**What works today (and should continue to):**
+- `clawcal` uses EventKit (Calendar permission, not FDA) — works from bot via launchd
+- Compiled Swift binaries with codesign identities (`com.clawcode.clawcal`) get their own TCC entries
+- Node.js (claude) doesn't inherit python's FDA deny for most operations
+
+**What to watch for:**
+- New skills that need TCC-gated access (Contacts, Photos, Location) — each needs its own permission probe
+- macOS version updates that change TCC behavior (especially "responsible process" determination)
+- If Max subscription auth changes to require Keychain access, that's another TCC surface
+
 ### Security
 
 - **Local-only binding:** WebSocket server binds to `127.0.0.1` only, never `0.0.0.0`
@@ -236,23 +274,25 @@ Build the gateway process with claude process management and WebSocket server. M
 - [ ] `gateway/claude_pool.py` — claude process pool (spawn, stream, cancel, reap)
 - [ ] `gateway/router.py` — message routing between clients and claude processes
 - [ ] `gateway/protocol.py` — wire protocol message types and serialization
-- [ ] `gateway/scheduler.py` — asyncio cron scheduler (absorbs schedule-runner)
 - [ ] `gateway/main.py` — entry point, signal handling, graceful shutdown
 - [ ] `gateway/config.py` — gateway-specific config loading
+- [ ] `gateway/tcc.py` — TCC permission probes (clawcal calendars, etc.) run at startup, log warnings
 - [ ] Modify `bot/main.py` — replace `ClaudeBridge.invoke()` with gateway WebSocket client
 - [ ] Create `bot/gateway_client.py` — WebSocket client for bot → gateway communication
 - [ ] Add `gateway:` section to `config/config.yaml`
-- [ ] Create `launchd/com.clawcode.gateway.plist`
-- [ ] Update `scripts/install.sh` — install gateway service
+- [ ] Create `ClawCodeGateway.app` bundle wrapper (or extend `ClawCode.app` with mode flag)
+- [ ] Create `launchd/com.clawcode.gateway.plist` — launches through app bundle for TCC identity
+- [ ] Update `scripts/install.sh` — build app bundle, install gateway service
 - [ ] Add `websockets` to `pyproject.toml` dependencies
-- [ ] Update `clawcode doctor` — add gateway health check
+- [ ] Update `clawcode doctor` — add gateway health check + TCC permission status
 
 **Success criteria:**
-- [ ] Gateway starts via launchd, stays running
+- [ ] Gateway starts via launchd through app bundle, stays running
 - [ ] Discord bot connects to gateway, sends messages, receives responses
 - [ ] Discord messages use long-running claude processes (not one-shot `--print`)
 - [ ] Session persistence across gateway restart
-- [ ] `clawcode doctor` reports gateway health
+- [ ] `clawcode doctor` reports gateway health and TCC permission status
+- [ ] TCC-gated tool failures mid-session produce actionable error messages (not crashes)
 
 **Estimated effort:** Large — this is the core infrastructure.
 
@@ -372,6 +412,7 @@ Just wrap `claude` CLI in a script with session tracking. Doesn't solve: Discord
 - **Max subscription rate limits:** Unpublished. Multiple concurrent claude processes may hit limits. Mitigate with configurable process pool cap and backoff.
 - **Pty management complexity:** Allocating and managing ptys for TUI sessions adds OS-level complexity. Use Python's `pty` module, test thoroughly on macOS.
 - **Migration disruption:** Running old bot and new gateway simultaneously risks duplicate Discord responses. Use feature flag to cut over cleanly.
+- **macOS TCC permission chain:** Gateway must launch through an app bundle to establish a stable TCC identity. Without it, TCC grants for Calendar, Reminders, etc. may not apply to claude subprocesses. The python3.13 FDA deny remains — tools that need FDA must avoid python in the ancestor chain (compiled Swift binaries like clawcal already handle this). TCC grants can be revoked mid-session; gateway must handle permission-denied errors gracefully.
 
 ## Migration Path
 
@@ -398,6 +439,7 @@ Just wrap `claude` CLI in a script with session tracking. Doesn't solve: Discord
 | `gateway/protocol.py` | Wire protocol types and serialization |
 | `gateway/scheduler.py` | Asyncio cron scheduler |
 | `gateway/config.py` | Gateway config loading |
+| `gateway/tcc.py` | TCC permission probes (startup diagnostics) |
 | `bot/gateway_client.py` | WebSocket client for bot → gateway |
 | `cli/tui.py` | TUI client (pty attachment) |
 | `launchd/com.clawcode.gateway.plist` | launchd agent for gateway |

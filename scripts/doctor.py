@@ -491,6 +491,54 @@ def _parse_mcp_servers(mcp_config: Path) -> list[str]:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def check_gateway() -> bool:
+    """Check if the gateway process is running and reachable."""
+    import socket
+
+    # Check if gateway app bundle exists
+    gw_app = PROJECT_DIR / "ClawCodeGateway.app" / "Contents" / "MacOS" / "ClawCodeGateway"
+    if not gw_app.exists():
+        return check("Gateway app bundle", False, "", "ClawCodeGateway.app not found",
+                      fix="Run scripts/install.sh to build the gateway app bundle", warn=True)
+
+    # Check if gateway launchd agent is loaded
+    uid = os.getuid()
+    result = subprocess.run(
+        ["launchctl", "print", f"gui/{uid}/com.clawcode.gateway"],
+        capture_output=True, text=True,
+    )
+    agent_loaded = result.returncode == 0
+
+    if not agent_loaded:
+        return check("Gateway service", False, "", "launchd agent not loaded",
+                      fix="launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.clawcode.gateway.plist",
+                      warn=True)
+
+    # Check if gateway port is reachable
+    try:
+        # Read port from config
+        port = 7429
+        config_path = PROJECT_DIR / "config" / "config.yaml"
+        if config_path.exists():
+            import yaml
+            with open(config_path) as f:
+                raw = yaml.safe_load(f)
+            gw_raw = raw.get("gateway", {}) or {}
+            port = int(gw_raw.get("port", 7429))
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        result_code = sock.connect_ex(("127.0.0.1", port))
+        sock.close()
+        reachable = result_code == 0
+    except Exception:
+        reachable = False
+
+    return check("Gateway reachable", reachable, f"ws://127.0.0.1:{port}",
+                  f"port {port} not responding",
+                  fix="Check gateway logs: data/logs/gateway-stderr.log", warn=True)
+
+
 def main():
     print(f"\n{BOLD}ClawCode Doctor{RESET}")
     print(f"Project: {PROJECT_DIR}\n")
@@ -521,6 +569,9 @@ def main():
     all_ok &= check_mcp_servers()
     check_context_cache()  # optional, don't fail on it
     check_memory_index()  # optional, don't fail on it
+
+    section("Gateway")
+    check_gateway()  # optional, don't fail on it
 
     section("MCP Services")
     for result in check_gmail_mcp():
