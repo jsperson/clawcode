@@ -69,6 +69,7 @@ class UserMessage:
     type: str = field(default="message", init=False)
     session_id: str = ""
     content: str = ""
+    attachments: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass

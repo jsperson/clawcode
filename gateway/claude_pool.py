@@ -10,6 +10,7 @@ Messages are sent as JSON on stdin, responses stream back as JSON events on stdo
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -77,26 +78,52 @@ class ClaudeProcess:
             return data.get("session_id")
         return None
 
-    async def send_message(self, content: str) -> None:
+    async def send_message(self, content: str, attachments: list[dict] | None = None) -> None:
         """Send a user message to the claude process via stdin.
 
-        Uses the Claude CLI stream-json input format:
+        Uses the Claude CLI stream-json input format with content blocks:
         {"type":"user","message":{"role":"user","content":[{"type":"text","text":"..."}]}}
+
+        Attachments are converted to content blocks:
+        - Images → {"type":"image","source":{"type":"base64","media_type":"...","data":"..."}}
+        - Text files → {"type":"text","text":"[filename]\n<decoded content>"}
         """
         if not self.alive:
             raise RuntimeError(f"Claude process {self.pid} is not alive")
+
+        blocks: list[dict] = []
+        if content:
+            blocks.append({"type": "text", "text": content})
+
+        for att in (attachments or []):
+            ct = att.get("content_type", "")
+            if ct.startswith("image/"):
+                blocks.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": ct, "data": att["data"]},
+                })
+            else:
+                try:
+                    text = base64.b64decode(att["data"]).decode("utf-8", errors="replace")
+                    blocks.append({"type": "text", "text": f"[{att.get('filename', 'file')}]\n{text}"})
+                except Exception:
+                    pass
+
+        if not blocks:
+            return
 
         msg = json.dumps({
             "type": "user",
             "message": {
                 "role": "user",
-                "content": [{"type": "text", "text": content}],
+                "content": blocks,
             },
         })
         self.proc.stdin.write((msg + "\n").encode("utf-8"))
         await self.proc.stdin.drain()
         self.message_count += 1
-        logger.debug("Sent message to claude pid=%s (%d chars)", self.pid, len(content))
+        logger.debug("Sent message to claude pid=%s (%d chars, %d attachments)",
+                      self.pid, len(content), len(attachments or []))
 
     async def read_response(self, hang_timeout: int = 120) -> AsyncIterator[dict]:
         """Read streaming JSON events from claude stdout until a result event.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -103,6 +104,71 @@ def _refresh_context(config: Config) -> str:
     write_cache(config, context)
     logger.info("Context cache refreshed (%d chars)", len(context))
     return context
+
+
+# ---------------------------------------------------------------------------
+# Discord attachment handling
+# ---------------------------------------------------------------------------
+
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+TEXT_EXTENSIONS = {
+    ".py", ".txt", ".json", ".csv", ".md", ".yaml", ".yml",
+    ".js", ".ts", ".html", ".css", ".sh", ".rb", ".rs",
+    ".go", ".swift", ".sql", ".xml", ".toml", ".ini", ".log",
+}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_ATTACHMENTS = 5
+
+
+def _detect_image_type(data: bytes) -> str | None:
+    """Detect image type from magic bytes. Returns MIME type or None."""
+    if data[:8] == b'\x89PNG\r\n\x1a\n':
+        return "image/png"
+    if data[:2] == b'\xff\xd8':
+        return "image/jpeg"
+    if data[:4] == b'GIF8':
+        return "image/gif"
+    if data[:4] == b'RIFF' and len(data) > 12 and data[8:12] == b'WEBP':
+        return "image/webp"
+    return None
+
+
+async def _download_attachments(discord_attachments: list) -> list[dict]:
+    """Download and encode Discord attachments for the gateway."""
+    results = []
+    for att in discord_attachments[:MAX_ATTACHMENTS]:
+        if att.size > MAX_FILE_SIZE:
+            logger.warning("Skipping oversized attachment: %s (%d bytes)", att.filename, att.size)
+            continue
+
+        content_type = att.content_type or ""
+        ext = Path(att.filename).suffix.lower()
+        is_image = content_type.startswith("image/")
+        is_text = ext in TEXT_EXTENSIONS
+
+        if not is_image and not is_text:
+            continue
+
+        try:
+            data = await att.read()
+        except Exception:
+            logger.warning("Failed to download attachment: %s", att.filename)
+            continue
+
+        if is_image:
+            detected = _detect_image_type(data)
+            if not detected:
+                continue  # not a valid image
+            content_type = detected  # trust magic bytes over extension
+
+        results.append({
+            "filename": att.filename,
+            "content_type": content_type if is_image else "text/plain",
+            "data": base64.b64encode(data).decode("ascii"),
+        })
+        logger.info("Attachment: %s (%d bytes, %s)", att.filename, len(data), content_type)
+
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +293,12 @@ def create_bot(config: Config) -> discord.Client:
             return
 
         user_text = message.content.strip()
-        if not user_text:
+
+        # Download attachments (images, text files)
+        attachments = await _download_attachments(message.attachments)
+
+        # Allow image-only messages (no text required if attachments present)
+        if not user_text and not attachments:
             return
 
         # Restart command — trigger graceful shutdown, launchd restarts
@@ -244,7 +315,8 @@ def create_bot(config: Config) -> discord.Client:
             await message.channel.send("Context cache rebuilt.")
             return
 
-        logger.info("Message from %s: %s", message.author, user_text[:100])
+        logger.info("Message from %s: %s%s", message.author, user_text[:100],
+                     f" (+{len(attachments)} attachments)" if attachments else "")
 
         # Show typing indicator while Claude processes
         async with message.channel.typing():
@@ -254,8 +326,11 @@ def create_bot(config: Config) -> discord.Client:
                     response = await gw_client.send_message(
                         channel_id=str(message.channel.id),
                         content=user_text,
+                        attachments=attachments if attachments else None,
                     )
                 else:
+                    if attachments:
+                        logger.info("Attachments dropped — gateway unavailable")
                     append_prompt = _get_context(config)
                     response = await bridge.invoke(
                         message=user_text,
