@@ -22,7 +22,8 @@
 - Config: `config/config.yaml`
 - Bot code: `bot/`
 - Skills: `skills/`
-- Memory: `memory/` (daily logs), `MEMORY.md`, `USER.md`, `IDENTITY.md`
+- Identity layer: `SOUL.md` (philosophy), `STYLE.md` (voice), `IDENTITY.md` (presentation), `USER.md` (user profile)
+- Memory: `memory/` (daily logs), `MEMORY.md`
 - CLI wrapper: `cli/clawcode`
 
 **Backend:** Claude Code CLI (`~/.npm-global/bin/claude`) via Max subscription
@@ -124,12 +125,22 @@ Schedules are macOS launchd agents, independent of the Discord bot process.
 
 ## Planned Features
 
-### Memory Search (separate project)
-Replace bulk memory injection with on-demand search. Index MEMORY.md + memory/*.md with hybrid BM25 + vector search (SQLite). Provide memory_search + memory_get tools to Claude. System prompt instructs Claude to search before answering questions about history/preferences.
+### Unified CLI / Discord Session
+Bridge CLI and Discord into a single shared session so you can move between interfaces within the same conversation — similar to OpenClaw's multi-interface model. Scheduled task output (heartbeat, trends, etc.) would surface in both places.
+
+### Discord Image/Attachment Support
+Bot ignores `message.attachments`. Would need to download images and route to Claude via Anthropic API (CLI doesn't support image input via stdin). Enables image analysis, OCR, screenshot interpretation.
 
 ---
 
 ## Completed Features
+
+### Memory Search — 2026-02-08
+- `bot/memory_search.py` — SQLite FTS5 full-text search over MEMORY.md + daily logs
+- BM25 ranking with porter stemming, lazy mtime-based re-indexing
+- Chunks MEMORY.md by `###` headings, daily logs by `###` time entries
+- CLI: `clawcode memory search|index|stats`
+- System prompt instructs Claude to run `clawcode memory search` before reading files directly
 
 ### Background Startup — 2026-02-08
 - Bot runs as launchd agent (`com.clawcode.bot`) with `KeepAlive` + `RunAtLoad`

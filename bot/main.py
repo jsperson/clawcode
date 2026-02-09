@@ -268,18 +268,18 @@ def _get_context(config: Config) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Context file watcher — watches SKILL.md, IDENTITY.md, USER.md
+# Context file watcher — watches SOUL.md, STYLE.md, SKILL.md, IDENTITY.md, USER.md
 # ---------------------------------------------------------------------------
 
 # Files that trigger a context cache refresh when modified
-_CONTEXT_WATCH_PATTERNS = {"SKILL.md", "IDENTITY.md", "USER.md"}
+_CONTEXT_WATCH_PATTERNS = {"SOUL.md", "STYLE.md", "SKILL.md", "IDENTITY.md", "USER.md"}
 
 
 def _start_context_watcher(client: discord.Client) -> None:
     """Start a watchdog observer for context-relevant files.
 
-    Watches skills dir + project root for changes to SKILL.md, IDENTITY.md,
-    USER.md. Triggers context cache rebuild on changes.
+    Watches skills dir + project root for changes to SOUL.md, STYLE.md,
+    SKILL.md, IDENTITY.md, USER.md. Triggers context cache rebuild on changes.
     """
     try:
         from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent, FileDeletedEvent
@@ -336,7 +336,7 @@ def _start_context_watcher(client: discord.Client) -> None:
     if skills_dir.is_dir():
         observer.schedule(handler, str(skills_dir), recursive=True)
 
-    # Watch project root for IDENTITY.md, USER.md
+    # Watch project root for SOUL.md, STYLE.md, IDENTITY.md, USER.md
     project_dir = Path(config.paths.project_dir)
     if project_dir.is_dir():
         observer.schedule(handler, str(project_dir), recursive=False)
