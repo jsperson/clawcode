@@ -17,6 +17,9 @@ fi
 # cd so .claude/CLAUDE.md is loaded automatically
 cd "$CLAWCODE_DIR"
 
+# Mark this as a ClawCode session (used by statusline script)
+export CLAWCODE_SESSION=1
+
 # ---------------------------------------------------------------------------
 # Banner + terminal title (interactive sessions only)
 # ---------------------------------------------------------------------------
