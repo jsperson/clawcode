@@ -63,47 +63,21 @@ BANNER
 # Theme swap — use a distinct theme so ClawCode looks different from claude
 # ---------------------------------------------------------------------------
 
-CLAUDE_JSON="$HOME/.claude.json"
-CLAWCODE_THEME="dark"
-_ORIG_THEME=""
+# ---------------------------------------------------------------------------
+# Terminal background tint — subtle color shift to distinguish from claude
+# ---------------------------------------------------------------------------
 
-_swap_theme() {
-    # Save original theme and set ClawCode theme
-    if [ -f "$CLAUDE_JSON" ]; then
-        _ORIG_THEME=$("$VENV_PYTHON" -c "
-import json, sys
-try:
-    d = json.load(open('$CLAUDE_JSON'))
-    print(d.get('theme', ''))
-except: pass
-" 2>/dev/null || true)
-    fi
-    "$VENV_PYTHON" -c "
-import json
-p = '$CLAUDE_JSON'
-try:
-    d = json.load(open(p))
-except: d = {}
-d['theme'] = '$CLAWCODE_THEME'
-json.dump(d, open(p, 'w'), indent=2)
-print()
-" 2>/dev/null
+# Dark navy tint for ClawCode sessions
+CLAWCODE_BG="#0d1117"
+
+_tint_bg() {
+    # Save original background and set tinted one (OSC 11)
+    printf '\033]11;%s\007' "$CLAWCODE_BG"
 }
 
-_restore_theme() {
-    # Restore original theme on exit
-    if [ -n "$_ORIG_THEME" ] && [ -f "$CLAUDE_JSON" ]; then
-        "$VENV_PYTHON" -c "
-import json
-p = '$CLAUDE_JSON'
-try:
-    d = json.load(open(p))
-except: d = {}
-d['theme'] = '$_ORIG_THEME'
-json.dump(d, open(p, 'w'), indent=2)
-print()
-" 2>/dev/null
-    fi
+_restore_bg() {
+    # Reset terminal background to default (OSC 110)
+    printf '\033]110\007'
 }
 
 # Build context args from cache
@@ -116,8 +90,8 @@ _context_args() {
 
 if [ $# -eq 0 ]; then
     _banner
-    _swap_theme
-    trap '_restore_theme' EXIT
+    _tint_bg
+    trap '_restore_bg' EXIT
     # Interactive session (no exec — need to restore theme on exit)
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
@@ -308,8 +282,8 @@ elif [ "$1" = "memory" ]; then
 elif [ "$1" = "tui" ]; then
     # TUI client — attach to gateway session, run claude interactively
     _banner
-    _swap_theme
-    trap '_restore_theme' EXIT
+    _tint_bg
+    trap '_restore_bg' EXIT
     "$VENV_PYTHON" "$CLAWCODE_DIR/cli/tui.py"
 
 elif [ "$1" = "restart" ]; then
@@ -321,8 +295,8 @@ elif [ "$1" = "restart" ]; then
 elif [ "$1" = "--continue" ]; then
     # Resume last session
     _banner
-    _swap_theme
-    trap '_restore_theme' EXIT
+    _tint_bg
+    trap '_restore_bg' EXIT
     shift
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
