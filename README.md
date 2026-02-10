@@ -164,6 +164,57 @@ The CLI wrapper changes to `~/clawcode` (so Claude Code loads `.claude/CLAUDE.md
 
 `clawcode tui` connects to the gateway, lists active sessions (including Discord conversations), and lets you attach to one. It hands off to native `claude --resume` for a full interactive terminal experience, then detaches cleanly.
 
+## Skills
+
+Skills are modular capability definitions that teach Claude how to use specific tools and services. Each skill is a markdown file with eligibility gates — Claude only sees skills whose requirements are met on the current system.
+
+| Skill | Description | Requires |
+|-------|-------------|----------|
+| **apple-reminders** | Create, list, complete, and query Apple Reminders | `remindctl` binary (macOS) |
+| **calendar** | Read and create macOS Calendar events via EventKit | `clawcal` binary (macOS) |
+| **canvas** | Query Newman University Canvas LMS — assignments, grades, submissions, quizzes (112 commands) | Python 3 |
+| **daily-digest** | Generate morning briefing with calendar, tasks, projects, and Canvas data | `remindctl`, `icalpal`, `jq` |
+| **gmail** | Search, read, send, draft, archive, and label emails via 40+ MCP tools | `gmail-mcp` server |
+| **icalpal** | Read-only calendar and reminders queries (alternative to clawcal) | `icalpal` binary (macOS) |
+| **notes-inbound** | OCR and archive handwritten note PDFs from Obsidian Inbox | `pdftoppm` |
+| **scheduler** | Add, modify, enable/disable recurring scheduled tasks via launchd | `launchctl` (macOS) |
+| **scott-vault** | Obsidian vault structure, folder routing, and content filing conventions | macOS |
+
+## Features
+
+### Core
+- **Persistent identity** — SOUL.md, STYLE.md, IDENTITY.md define who the agent is across every interaction
+- **User profile** — USER.md gives Claude context about the user's life, preferences, and goals
+- **Session continuity** — Discord conversations persist across messages with automatic session resume
+- **Context caching** — identity, skills, and memory instructions assembled once, rebuilt on file changes
+- **Concurrency control** — semaphore prevents overlapping Claude invocations on the same session
+
+### Interfaces
+- **Discord bot** — primary conversational interface, runs as a launchd service with auto-restart
+- **CLI** — one-shot queries or interactive sessions with full context injection
+- **TUI** — attach to gateway sessions (including active Discord conversations) from the terminal
+
+### Automation
+- **Scheduled tasks** — cron-style definitions in YAML, executed as native macOS launchd agents
+- **Schedule runner** — invokes Claude Code with a prompt and posts results to Discord
+- **File watcher** — monitors skill and identity files, rebuilds context cache on changes
+
+### Memory
+- **Curated knowledge** — MEMORY.md for long-term facts and preferences
+- **Daily logs** — automatic session summaries appended to `memory/YYYY-MM-DD.md`
+- **Full-text search** — SQLite FTS5 index over all memory files with BM25 ranking
+
+### Integration
+- **MCP servers** — declarative config for Model Context Protocol tool servers (Gmail, etc.)
+- **Obsidian vault** — read/write access to the user's knowledge base
+- **macOS services** — launchd for bot lifecycle, TCC-stable .app bundles for system permissions
+- **Discord REST API** — scheduled tasks post directly without the bot process
+
+### Infrastructure
+- **Gateway** (optional) — WebSocket server for shared Claude processes and multi-client routing
+- **Health checks** — `clawcode doctor` validates environment, dependencies, and service status
+- **Installer** — single-script setup: virtualenv, app bundles, launchd services, CLI symlinks
+
 ## Directory Structure
 
 ```
