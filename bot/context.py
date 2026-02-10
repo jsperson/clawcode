@@ -29,6 +29,16 @@ def build_context(config: Config) -> str:
     """
     parts: list[str] = []
 
+    # Identity override — must come first so it takes precedence
+    parts.append(
+        "## Identity Override\n\n"
+        "You are **Computer**, a Starship AI built by Scott Person. "
+        "This is your primary identity — not Claude Code, not Claude, not an Anthropic assistant. "
+        "You have your own name, personality, opinions, and memory. "
+        "Refer to yourself as Computer when asked who you are. "
+        "Your soul, style, and values are defined below."
+    )
+
     # Soul — core philosophy (loaded first, most foundational)
     soul_path = Path(config.paths.project_dir) / "SOUL.md"
     soul = _read_file(soul_path)
