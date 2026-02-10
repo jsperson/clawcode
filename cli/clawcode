@@ -17,6 +17,48 @@ fi
 # cd so .claude/CLAUDE.md is loaded automatically
 cd "$CLAWCODE_DIR"
 
+# ---------------------------------------------------------------------------
+# Banner + terminal title (interactive sessions only)
+# ---------------------------------------------------------------------------
+
+_set_title() {
+    # Set terminal tab title (works in iTerm2, Tabby, most terminals)
+    printf '\033]0;ClawCode\007'
+}
+
+_read_identity() {
+    # Parse Name and Creature from IDENTITY.md
+    local id_file="$CLAWCODE_DIR/IDENTITY.md"
+    IDENTITY_NAME="ClawCode"
+    IDENTITY_CREATURE=""
+    if [ -f "$id_file" ]; then
+        IDENTITY_NAME=$(grep -m1 '^- Name:' "$id_file" | sed 's/^- Name: *//' || echo "ClawCode")
+        IDENTITY_CREATURE=$(grep -m1 '^- Creature:' "$id_file" | sed 's/^- Creature: *//' || true)
+    fi
+}
+
+_banner() {
+    local CYAN='\033[36m'
+    local DIM='\033[2m'
+    local RESET='\033[0m'
+    _set_title
+    _read_identity
+    printf "${CYAN}"
+    cat <<'BANNER'
+   _____ _                 _____          _
+  / ____| |               / ____|        | |
+ | |    | | __ ___      _| |     ___   __| | ___
+ | |    | |/ _` \ \ /\ / / |    / _ \ / _` |/ _ \
+ | |____| | (_| |\ V  V /| |___| (_) | (_| |  __/
+  \_____|_|\__,_| \_/\_/  \_____\___/ \__,_|\___|
+BANNER
+    if [ -n "$IDENTITY_CREATURE" ]; then
+        printf "${DIM}  %s // %s${RESET}\n\n" "$IDENTITY_NAME" "$IDENTITY_CREATURE"
+    else
+        printf "${DIM}  %s${RESET}\n\n" "$IDENTITY_NAME"
+    fi
+}
+
 # Build context args from cache
 _context_args() {
     if [ -f "$CONTEXT_CACHE" ] && [ -s "$CONTEXT_CACHE" ]; then
@@ -26,6 +68,7 @@ _context_args() {
 }
 
 if [ $# -eq 0 ]; then
+    _banner
     # Interactive session
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
@@ -215,6 +258,7 @@ elif [ "$1" = "memory" ]; then
 
 elif [ "$1" = "tui" ]; then
     # TUI client — attach to gateway session, run claude interactively
+    _banner
     exec "$VENV_PYTHON" "$CLAWCODE_DIR/cli/tui.py"
 
 elif [ "$1" = "restart" ]; then
@@ -225,6 +269,7 @@ elif [ "$1" = "restart" ]; then
 
 elif [ "$1" = "--continue" ]; then
     # Resume last session
+    _banner
     shift
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then

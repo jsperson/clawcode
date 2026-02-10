@@ -3,8 +3,9 @@
 
 Usage: schedule-runner.py <task-name>
 
-Loads the task definition from config/schedules.yaml, invokes Claude Code CLI,
-posts the result to Discord via REST API, and updates state.json.
+Loads the task definition from config/schedules.yaml. Tasks with a `script`
+field run the script directly; tasks with a `prompt` field invoke Claude Code
+CLI. Results are posted to Discord via REST API and state.json is updated.
 """
 
 from __future__ import annotations
@@ -141,6 +142,31 @@ def build_context() -> str | None:
 
 
 # ---------------------------------------------------------------------------
+# Script execution (no Claude needed)
+# ---------------------------------------------------------------------------
+
+
+def invoke_script(script_cmd: str) -> str:
+    """Run a shell script directly and return its stdout."""
+    expanded = expand_path(script_cmd) if "~" in script_cmd else script_cmd
+    logger.info("Running script: %s", expanded)
+
+    result = subprocess.run(
+        ["bash", "-c", expanded],
+        capture_output=True,
+        text=True,
+        cwd=str(PROJECT_DIR),
+        timeout=300,
+    )
+
+    if result.returncode != 0:
+        logger.error("Script failed (rc=%d): %s", result.returncode, result.stderr)
+        raise RuntimeError(f"Script exited {result.returncode}: {result.stderr}")
+
+    return result.stdout.strip()
+
+
+# ---------------------------------------------------------------------------
 # Claude CLI invocation
 # ---------------------------------------------------------------------------
 
@@ -252,17 +278,26 @@ def main() -> None:
         logger.info("Task %s is disabled, skipping", task_name)
         sys.exit(0)
 
-    prompt = task["prompt"]
+    has_script = "script" in task
+    has_prompt = "prompt" in task
+
+    if not has_script and not has_prompt:
+        logger.error("Task %s has neither 'script' nor 'prompt'", task_name)
+        sys.exit(1)
+
     config = load_config()
 
     # Get Discord credentials
     bot_token = os.environ.get("DISCORD_TOKEN")
     channel_id = os.environ.get("DISCORD_CHANNEL_ID")
 
-    logger.info("Running scheduled task: %s", task_name)
+    logger.info("Running scheduled task: %s (mode=%s)", task_name, "script" if has_script else "prompt")
 
     try:
-        response = invoke_claude(prompt, config)
+        if has_script:
+            response = invoke_script(task["script"])
+        else:
+            response = invoke_claude(task["prompt"], config)
 
         # Post to Discord if credentials available
         if bot_token and channel_id:
