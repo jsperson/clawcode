@@ -63,22 +63,6 @@ BANNER
 # Theme swap — use a distinct theme so ClawCode looks different from claude
 # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Terminal background tint — subtle color shift to distinguish from claude
-# ---------------------------------------------------------------------------
-
-# Dark navy tint for ClawCode sessions
-CLAWCODE_BG="#0d1117"
-
-_tint_bg() {
-    # Save original background and set tinted one (OSC 11)
-    printf '\033]11;%s\007' "$CLAWCODE_BG"
-}
-
-_restore_bg() {
-    # Reset terminal background to default (OSC 110)
-    printf '\033]110\007'
-}
 
 # Build context args from cache
 _context_args() {
@@ -90,14 +74,12 @@ _context_args() {
 
 if [ $# -eq 0 ]; then
     _banner
-    _tint_bg
-    trap '_restore_bg' EXIT
-    # Interactive session (no exec — need to restore theme on exit)
+    # Interactive session
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
+        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
     else
-        "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT"
+        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT"
     fi
 
 elif [ "$1" = "doctor" ]; then
@@ -282,9 +264,7 @@ elif [ "$1" = "memory" ]; then
 elif [ "$1" = "tui" ]; then
     # TUI client — attach to gateway session, run claude interactively
     _banner
-    _tint_bg
-    trap '_restore_bg' EXIT
-    "$VENV_PYTHON" "$CLAWCODE_DIR/cli/tui.py"
+    exec "$VENV_PYTHON" "$CLAWCODE_DIR/cli/tui.py"
 
 elif [ "$1" = "restart" ]; then
     # Graceful restart via launchd — sends SIGTERM, then restarts
@@ -295,14 +275,12 @@ elif [ "$1" = "restart" ]; then
 elif [ "$1" = "--continue" ]; then
     # Resume last session
     _banner
-    _tint_bg
-    trap '_restore_bg' EXIT
     shift
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
+        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
     else
-        "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" "$@"
+        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" "$@"
     fi
 
 else
