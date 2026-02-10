@@ -59,6 +59,53 @@ BANNER
     fi
 }
 
+# ---------------------------------------------------------------------------
+# Theme swap — use a distinct theme so ClawCode looks different from claude
+# ---------------------------------------------------------------------------
+
+CLAUDE_JSON="$HOME/.claude.json"
+CLAWCODE_THEME="dark"
+_ORIG_THEME=""
+
+_swap_theme() {
+    # Save original theme and set ClawCode theme
+    if [ -f "$CLAUDE_JSON" ]; then
+        _ORIG_THEME=$("$VENV_PYTHON" -c "
+import json, sys
+try:
+    d = json.load(open('$CLAUDE_JSON'))
+    print(d.get('theme', ''))
+except: pass
+" 2>/dev/null || true)
+    fi
+    "$VENV_PYTHON" -c "
+import json
+p = '$CLAUDE_JSON'
+try:
+    d = json.load(open(p))
+except: d = {}
+d['theme'] = '$CLAWCODE_THEME'
+json.dump(d, open(p, 'w'), indent=2)
+print()
+" 2>/dev/null
+}
+
+_restore_theme() {
+    # Restore original theme on exit
+    if [ -n "$_ORIG_THEME" ] && [ -f "$CLAUDE_JSON" ]; then
+        "$VENV_PYTHON" -c "
+import json
+p = '$CLAUDE_JSON'
+try:
+    d = json.load(open(p))
+except: d = {}
+d['theme'] = '$_ORIG_THEME'
+json.dump(d, open(p, 'w'), indent=2)
+print()
+" 2>/dev/null
+    fi
+}
+
 # Build context args from cache
 _context_args() {
     if [ -f "$CONTEXT_CACHE" ] && [ -s "$CONTEXT_CACHE" ]; then
@@ -69,12 +116,14 @@ _context_args() {
 
 if [ $# -eq 0 ]; then
     _banner
-    # Interactive session
+    _swap_theme
+    trap '_restore_theme' EXIT
+    # Interactive session (no exec — need to restore theme on exit)
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
+        "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
     else
-        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT"
+        "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT"
     fi
 
 elif [ "$1" = "doctor" ]; then
@@ -259,7 +308,9 @@ elif [ "$1" = "memory" ]; then
 elif [ "$1" = "tui" ]; then
     # TUI client — attach to gateway session, run claude interactively
     _banner
-    exec "$VENV_PYTHON" "$CLAWCODE_DIR/cli/tui.py"
+    _swap_theme
+    trap '_restore_theme' EXIT
+    "$VENV_PYTHON" "$CLAWCODE_DIR/cli/tui.py"
 
 elif [ "$1" = "restart" ]; then
     # Graceful restart via launchd — sends SIGTERM, then restarts
@@ -270,12 +321,14 @@ elif [ "$1" = "restart" ]; then
 elif [ "$1" = "--continue" ]; then
     # Resume last session
     _banner
+    _swap_theme
+    trap '_restore_theme' EXIT
     shift
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
+        "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
     else
-        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" "$@"
+        "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" "$@"
     fi
 
 else
