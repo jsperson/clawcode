@@ -219,6 +219,11 @@ class Router:
         if not session:
             return
 
+        # Reactivate idle sessions on message (matches _handle_session_resume)
+        if session.status == SessionStatus.IDLE:
+            self._sessions.set_status(session.id, SessionStatus.ACTIVE)
+            self._sessions.update_activity(session.id)
+
         # Reject messages for sessions attached to a TUI client
         if session.attached_by:
             await client.send(ErrorEvent(

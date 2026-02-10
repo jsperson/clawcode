@@ -233,6 +233,7 @@ def create_bot(config: Config) -> discord.Client:
             host=config.gateway.host,
             port=config.gateway.port,
             auth_token=config.gateway.auth_token,
+            sessions_path=str(Path(config.paths.data_dir) / "gateway-sessions.json"),
         )
 
     # Store references for later phases (scheduler, file watcher)
@@ -255,17 +256,22 @@ def create_bot(config: Config) -> discord.Client:
             pass
 
         # Connect to gateway if enabled
+        restored = 0
         if gw_client:
             ok = await gw_client.connect()
             if ok:
-                logger.info("Bot connected to gateway")
+                restored = gw_client.session_count
+                logger.info("Bot connected to gateway (%d sessions restored)", restored)
             else:
                 logger.warning("Gateway connection failed — falling back to direct invocation")
 
         # Notify Discord channel
         try:
             channel = await client.fetch_channel(config.discord.channel_id)
-            await channel.send("\U0001f7e2 Online.")
+            if restored:
+                await channel.send(f"\U0001f7e2 Online. ({restored} session{'s' if restored != 1 else ''} restored)")
+            else:
+                await channel.send("\U0001f7e2 Online.")
         except Exception:
             logger.exception("Error sending startup message")
 

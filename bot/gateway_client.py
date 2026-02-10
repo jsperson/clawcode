@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from pathlib import Path
 from typing import AsyncIterator
 
 import websockets
@@ -25,9 +26,11 @@ class GatewayClient:
         host: str = "127.0.0.1",
         port: int = 7429,
         auth_token: str = "",
+        sessions_path: str = "data/gateway-sessions.json",
     ) -> None:
         self._uri = f"ws://{host}:{port}"
         self._auth_token = auth_token
+        self._sessions_path = Path(sessions_path)
         self._ws: websockets.ClientConnection | None = None
         self._connected = False
         self._client_id: str | None = None
@@ -38,6 +41,34 @@ class GatewayClient:
     @property
     def connected(self) -> bool:
         return self._connected and self._ws is not None
+
+    @property
+    def session_count(self) -> int:
+        """Number of cached channel→session mappings."""
+        return len(self._sessions)
+
+    def _load_sessions(self) -> int:
+        """Load channel→session mapping from disk. Returns count loaded."""
+        try:
+            if self._sessions_path.exists():
+                data = json.loads(self._sessions_path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    self._sessions = data
+                    logger.info("Loaded %d persisted sessions from %s", len(data), self._sessions_path)
+                    return len(data)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Failed to load persisted sessions: %s", e)
+        return 0
+
+    def _save_sessions(self) -> None:
+        """Persist channel→session mapping to disk."""
+        try:
+            self._sessions_path.parent.mkdir(parents=True, exist_ok=True)
+            self._sessions_path.write_text(
+                json.dumps(self._sessions, indent=2) + "\n", encoding="utf-8"
+            )
+        except OSError as e:
+            logger.warning("Failed to save sessions: %s", e)
 
     async def connect(self) -> bool:
         """Connect to the gateway and authenticate.
@@ -73,6 +104,7 @@ class GatewayClient:
             if data.get("type") == "auth.ok":
                 self._client_id = data.get("client_id")
                 self._connected = True
+                self._load_sessions()
                 self._reader_task = asyncio.create_task(self._read_loop())
                 logger.info("Connected to gateway at %s (client=%s)", self._uri, self._client_id[:8])
                 return True
@@ -91,6 +123,7 @@ class GatewayClient:
     async def disconnect(self) -> None:
         """Disconnect from the gateway."""
         self._connected = False
+        self._save_sessions()
         if self._reader_task:
             self._reader_task.cancel()
             try:
@@ -128,9 +161,15 @@ class GatewayClient:
 
         # Get or create a session for this channel
         session_id = self._sessions.get(channel_id)
+        resumed = session_id is not None
         if not session_id:
             session_id = await self._create_session(channel_id)
             self._sessions[channel_id] = session_id
+            self._save_sessions()
+        if resumed:
+            logger.info("Resuming session %s for channel %s", session_id[:8], channel_id)
+        else:
+            logger.info("New session %s for channel %s", session_id[:8], channel_id)
 
         # Set up response queue
         queue: asyncio.Queue = asyncio.Queue()
@@ -166,6 +205,7 @@ class GatewayClient:
                     # Session not found — clear cached session and retry
                     if code in ("session_not_found", "session_expired"):
                         self._sessions.pop(channel_id, None)
+                        self._save_sessions()
                         raise RuntimeError(f"Session error ({code}): {message}")
 
                     raise RuntimeError(f"Gateway error ({code}): {message}")

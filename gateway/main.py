@@ -133,6 +133,10 @@ class Gateway:
         if self._server:
             await self._server.stop()
 
+        # Mark all active sessions as idle (resumable after restart)
+        if self._session_mgr:
+            self._session_mgr.idle_all_active()
+
         # Kill all claude processes
         if self._claude_pool:
             await self._claude_pool.kill_all()

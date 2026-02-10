@@ -225,6 +225,20 @@ class SessionManager:
             logger.info("Expired %d old sessions", len(sessions))
         return sessions
 
+    def idle_all_active(self) -> int:
+        """Mark all active sessions as idle. Used during graceful shutdown.
+
+        Returns the number of sessions transitioned.
+        """
+        cursor = self._conn.execute(
+            "UPDATE sessions SET status = ? WHERE status = ?",
+            (SessionStatus.IDLE.value, SessionStatus.ACTIVE.value),
+        )
+        count = cursor.rowcount
+        if count:
+            logger.info("Marked %d active sessions as idle (shutdown)", count)
+        return count
+
     # -----------------------------------------------------------------------
     # Message history
     # -----------------------------------------------------------------------
