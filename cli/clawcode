@@ -59,11 +59,6 @@ BANNER
     fi
 }
 
-# ---------------------------------------------------------------------------
-# Theme swap — use a distinct theme so ClawCode looks different from claude
-# ---------------------------------------------------------------------------
-
-
 # Build context args from cache
 _context_args() {
     if [ -f "$CONTEXT_CACHE" ] && [ -s "$CONTEXT_CACHE" ]; then
