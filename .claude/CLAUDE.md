@@ -52,8 +52,4 @@ Skills are loaded from `~/clawcode/skills/*/SKILL.md`. Each skill has YAML front
 
 ## Daily Log
 
-At the end of meaningful interactions, append a summary to today's daily log at `memory/YYYY-MM-DD.md`. Include:
-- Key decisions made
-- Tasks completed
-- Notable information learned
-- Open items or follow-ups
+Discord conversations are automatically logged to `memory/YYYY-MM-DD.md` in real-time by the bot. You do NOT need to write end-of-session summaries — the raw exchanges are the record. Memory search indexes these logs for retrieval.

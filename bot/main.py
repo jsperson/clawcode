@@ -42,6 +42,41 @@ def _update_bot_state(config: Config, event: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Conversation logging — append exchanges to daily log
+# ---------------------------------------------------------------------------
+
+
+def _log_conversation(
+    config: Config,
+    author: str,
+    user_text: str,
+    attachments: list[dict],
+    response: str | None,
+) -> None:
+    """Log a Discord conversation exchange to today's daily log."""
+    try:
+        from .memory import append_daily_log
+
+        parts = [f"**{author}:** {user_text}" if user_text else f"**{author}:** *(no text)*"]
+        if attachments:
+            names = ", ".join(a["filename"] for a in attachments)
+            parts.append(f"*Attachments: {names}*")
+        parts.append("")  # blank line
+        if response:
+            # Truncate very long responses to keep logs manageable
+            if len(response) > 2000:
+                parts.append(f"**Computer:** {response[:2000]}… *(truncated, {len(response)} chars)*")
+            else:
+                parts.append(f"**Computer:** {response}")
+        else:
+            parts.append("**Computer:** *(no response — error)*")
+
+        append_daily_log(config, "\n".join(parts))
+    except Exception:
+        logger.debug("Failed to log conversation", exc_info=True)
+
+
+# ---------------------------------------------------------------------------
 # Discord message splitting — respect 2000 char limit
 # ---------------------------------------------------------------------------
 
@@ -370,6 +405,7 @@ def create_bot(config: Config) -> discord.Client:
 
         # Show typing indicator while Claude processes
         async with message.channel.typing():
+            response: str | None = None
             try:
                 # Route through gateway if connected, otherwise fall back to direct
                 if gw_client and gw_client.connected:
@@ -404,6 +440,10 @@ def create_bot(config: Config) -> discord.Client:
                 await message.channel.send(
                     "Something went wrong. Check the logs for details."
                 )
+            finally:
+                # Log conversation exchange to daily log
+                _log_conversation(config, str(message.author), user_text,
+                                  attachments, response)
 
     return client
 
