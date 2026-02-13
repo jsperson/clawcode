@@ -441,7 +441,7 @@ def create_bot(config: Config) -> discord.Client:
                             status_msg = await channel.send("*...*")
                             sent_messages.append(status_msg)
                         else:
-                            display = accumulated + " \u2588"  # block cursor
+                            display = accumulated + " \u23f3"  # hourglass
                             # Truncate display for Discord limit
                             if len(display) > MAX_DISCORD_LEN:
                                 display = display[:SAFE_LEN] + "..."
@@ -772,7 +772,7 @@ def create_bot(config: Config) -> discord.Client:
                     "user_text": user_text,
                     "attachments": attachments,
                 })
-                await message.add_reaction("\u23f3")  # hourglass
+                await message.add_reaction("\U0001f440")  # eyes
             except asyncio.QueueFull:
                 await message.channel.send(
                     "Queue is full (5 messages). Wait for the current task to finish."
