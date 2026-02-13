@@ -28,7 +28,8 @@ class ClaudeBridge:
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self._semaphore = asyncio.Semaphore(1)
+        self._user_semaphore = asyncio.Semaphore(1)
+        self._scheduled_semaphore = asyncio.Semaphore(1)
         self._sessions: dict[str, SessionInfo] = {}  # channel_id -> SessionInfo
         self._mcp_config_path: Path | None = self._build_mcp_config()
         self._sessions_path = Path(config.paths.data_dir) / "sessions.json"
@@ -209,7 +210,8 @@ class ClaudeBridge:
             len(message),
         )
 
-        async with self._semaphore:
+        sem = self._user_semaphore if priority else self._scheduled_semaphore
+        async with sem:
             env = os.environ.copy()
             # Prepend bin/ so Claude finds clawcal and other compiled tools
             bin_dir = str(Path(self.config.paths.project_dir) / "bin")

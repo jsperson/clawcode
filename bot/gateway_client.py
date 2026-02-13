@@ -43,6 +43,11 @@ class GatewayClient:
         return self._connected and self._ws is not None
 
     @property
+    def reader_alive(self) -> bool:
+        """True if the background reader task is running."""
+        return self._reader_task is not None and not self._reader_task.done()
+
+    @property
     def session_count(self) -> int:
         """Number of cached channel→session mappings."""
         return len(self._sessions)
@@ -79,8 +84,8 @@ class GatewayClient:
             self._ws = await asyncio.wait_for(
                 websockets.connect(
                     self._uri,
-                    ping_interval=20,
-                    ping_timeout=20,
+                    ping_interval=10,
+                    ping_timeout=10,
                     max_size=20_000_000,
                 ),
                 timeout=5,
@@ -176,6 +181,13 @@ class GatewayClient:
         if not self.connected:
             raise RuntimeError("Not connected to gateway")
 
+        # Verify reader task is healthy — if it died, responses won't arrive
+        if not self.reader_alive:
+            logger.warning("Reader task not running — reconnecting before send")
+            self._connected = False
+            if not await self._reconnect():
+                raise RuntimeError("Failed to reconnect to gateway (reader task dead)")
+
         # Get or create a session for this channel
         session_id = self._sessions.get(channel_id)
         resumed = session_id is not None
@@ -230,6 +242,9 @@ class GatewayClient:
                         raise RuntimeError(f"Session error ({code}): {message}")
 
                     raise RuntimeError(f"Gateway error ({code}): {message}")
+
+                else:
+                    logger.debug("Ignoring unknown event type in response stream: %s", event_type)
         except asyncio.TimeoutError:
             raise TimeoutError("Gateway response timed out after 300s")
         finally:
@@ -296,6 +311,14 @@ class GatewayClient:
                                 data.get("source"), data.get("task"))
                 elif event_type == "lifecycle":
                     logger.info("Gateway lifecycle: %s", data.get("event"))
+                else:
+                    # Unrouted event — log it so we can debug missed responses
+                    logger.warning(
+                        "Unrouted gateway event: type=%s session_id=%s (known queues: %s)",
+                        event_type,
+                        session_id[:8] if session_id else "none",
+                        ", ".join(k[:8] for k in self._response_queues),
+                    )
 
         except websockets.exceptions.ConnectionClosed:
             logger.warning("Gateway connection closed — attempting reconnect")
