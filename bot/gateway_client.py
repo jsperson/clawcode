@@ -120,6 +120,23 @@ class GatewayClient:
             self._connected = False
             return False
 
+    async def _reconnect(self, max_attempts: int = 5) -> bool:
+        """Attempt to reconnect to the gateway with exponential backoff.
+
+        Returns True if reconnection succeeded.
+        """
+        for attempt in range(1, max_attempts + 1):
+            delay = min(2 ** attempt, 60)
+            logger.info("Gateway reconnect attempt %d/%d in %ds...",
+                        attempt, max_attempts, delay)
+            await asyncio.sleep(delay)
+            if await self.connect():
+                logger.info("Gateway reconnected on attempt %d", attempt)
+                return True
+        logger.error("Gateway reconnect failed after %d attempts — "
+                     "messages will fall back to direct CLI", max_attempts)
+        return False
+
     async def disconnect(self) -> None:
         """Disconnect from the gateway."""
         self._connected = False
@@ -182,7 +199,11 @@ class GatewayClient:
             "content": content,
             "attachments": attachments or [],
         })
-        await self._ws.send(msg)
+        try:
+            await self._ws.send(msg)
+        except websockets.exceptions.ConnectionClosed:
+            self._connected = False
+            raise RuntimeError("Gateway connection lost — retrying next message")
 
         # Collect response chunks until complete
         full_response = []
@@ -225,7 +246,11 @@ class GatewayClient:
             "type": "session.create",
             "metadata": {"channel_id": channel_id},
         })
-        await self._ws.send(msg)
+        try:
+            await self._ws.send(msg)
+        except websockets.exceptions.ConnectionClosed:
+            self._connected = False
+            raise RuntimeError("Gateway connection lost during session creation")
 
         try:
             event = await asyncio.wait_for(queue.get(), timeout=10)
@@ -273,10 +298,12 @@ class GatewayClient:
                     logger.info("Gateway lifecycle: %s", data.get("event"))
 
         except websockets.exceptions.ConnectionClosed:
-            logger.warning("Gateway connection closed")
+            logger.warning("Gateway connection closed — attempting reconnect")
             self._connected = False
+            await self._reconnect()
         except asyncio.CancelledError:
             raise
         except Exception:
-            logger.exception("Error in gateway read loop")
+            logger.exception("Error in gateway read loop — attempting reconnect")
             self._connected = False
+            await self._reconnect()
