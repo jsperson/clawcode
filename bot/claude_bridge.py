@@ -16,6 +16,10 @@ from .config import Config
 logger = logging.getLogger(__name__)
 
 
+class ContextTooLargeError(RuntimeError):
+    """Raised when a session's context exceeds Claude's prompt size limit."""
+
+
 @dataclass
 class SessionInfo:
     session_id: str
@@ -248,10 +252,22 @@ class ClaudeBridge:
                 logger.info("Session conflict — creating fresh session for channel %s", channel_id)
                 del self._sessions[channel_id]
                 return await self.invoke(message, channel_id, append_prompt, priority)
+            # Context too large — session accumulated too many turns
+            err_lower = err_text.lower()
+            if "prompt is too long" in err_lower or ("context" in err_lower and "too large" in err_lower):
+                logger.warning("Context too large for session %s — clearing", session.session_id[:8])
+                del self._sessions[channel_id]
+                raise ContextTooLargeError(f"Session context exceeded limit: {err_text}")
             raise RuntimeError(f"Claude Code exited with code {proc.returncode}: {err_text}")
 
         session.message_count += 1
         response = self._extract_response(stdout)
+        # Check if the "response" is actually a context-too-large error
+        resp_lower = response.strip().lower()
+        if "prompt is too long" in resp_lower or ("context" in resp_lower and "too large" in resp_lower):
+            logger.warning("Context too large (returned as response) for session %s", session.session_id[:8])
+            del self._sessions[channel_id]
+            raise ContextTooLargeError(f"Session context exceeded limit: {response.strip()}")
         logger.info("Claude Code responded — %d chars", len(response))
         return response
 

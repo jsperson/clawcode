@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 import discord
 
-from .claude_bridge import ClaudeBridge
+from .claude_bridge import ClaudeBridge, ContextTooLargeError
 from .config import Config
 from .context import build_context, write_cache
 from .gateway_client import GatewayClient
@@ -428,6 +428,37 @@ def create_bot(config: Config) -> discord.Client:
                 for chunk in split_message(response):
                     await message.channel.send(chunk)
 
+            except ContextTooLargeError:
+                logger.warning("Context too large — clearing session and retrying")
+                # Clear gateway session cache so retry starts fresh
+                if gw_client:
+                    gw_client._sessions.pop(str(message.channel.id), None)
+                    gw_client._save_sessions()
+                await message.channel.send(
+                    "Session context was too large — starting fresh."
+                )
+                # Retry once with a clean session
+                try:
+                    if gw_client and gw_client.connected:
+                        response = await gw_client.send_message(
+                            channel_id=str(message.channel.id),
+                            content=user_text,
+                            attachments=attachments if attachments else None,
+                        )
+                    else:
+                        append_prompt = _get_context(config)
+                        response = await bridge.invoke(
+                            message=user_text,
+                            channel_id=str(message.channel.id),
+                            append_prompt=append_prompt,
+                        )
+                    for chunk in split_message(response):
+                        await message.channel.send(chunk)
+                except Exception:
+                    logger.exception("Retry after context-too-large also failed")
+                    await message.channel.send(
+                        "Retry also failed. Try again in a moment."
+                    )
             except TimeoutError:
                 await message.channel.send(
                     "Timed out waiting for Claude Code. Try again or simplify the request."

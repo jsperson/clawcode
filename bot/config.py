@@ -89,7 +89,7 @@ class GatewayConfig:
     socket_path: str = "data/gateway.sock"
     max_sessions: int = 5
     max_claude_processes: int = 3
-    session_idle_timeout_minutes: int = 30
+    session_idle_timeout_minutes: int = 120
     session_expiry_minutes: int = 120
     reconnect_window_minutes: int = 5
     claude_hang_timeout_seconds: int = 120

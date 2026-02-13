@@ -15,6 +15,8 @@ from typing import AsyncIterator
 
 import websockets
 
+from .claude_bridge import ContextTooLargeError
+
 logger = logging.getLogger(__name__)
 
 
@@ -229,19 +231,36 @@ class GatewayClient:
 
                 elif event_type == "response":
                     # Complete response — use result text
-                    return event.get("content", "".join(full_response))
+                    result = event.get("content", "".join(full_response))
+                    # Check if the "response" is actually a context-too-large error
+                    # that the gateway passed through as normal content
+                    result_lower = result.strip().lower()
+                    if "prompt is too long" in result_lower or ("context" in result_lower and "too large" in result_lower):
+                        logger.warning("Context too large (returned as response content) for channel %s", channel_id)
+                        self._sessions.pop(channel_id, None)
+                        self._save_sessions()
+                        raise ContextTooLargeError(f"Session context exceeded limit: {result.strip()}")
+                    return result
 
                 elif event_type == "error":
                     code = event.get("code", "unknown")
-                    message = event.get("message", "Unknown error")
+                    error_msg = event.get("message", "Unknown error")
 
                     # Session not found — clear cached session and retry
                     if code in ("session_not_found", "session_expired"):
                         self._sessions.pop(channel_id, None)
                         self._save_sessions()
-                        raise RuntimeError(f"Session error ({code}): {message}")
+                        raise RuntimeError(f"Session error ({code}): {error_msg}")
 
-                    raise RuntimeError(f"Gateway error ({code}): {message}")
+                    # Context too large — session exceeded Claude's prompt limit
+                    error_lower = error_msg.lower()
+                    if "prompt is too long" in error_lower or ("context" in error_lower and "too large" in error_lower):
+                        logger.warning("Context too large for channel %s — clearing session", channel_id)
+                        self._sessions.pop(channel_id, None)
+                        self._save_sessions()
+                        raise ContextTooLargeError(f"Session context exceeded limit: {error_msg}")
+
+                    raise RuntimeError(f"Gateway error ({code}): {error_msg}")
 
                 else:
                     logger.debug("Ignoring unknown event type in response stream: %s", event_type)

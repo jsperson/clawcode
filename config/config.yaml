@@ -23,7 +23,7 @@ gateway:
   socket_path: data/gateway.sock
   max_sessions: 5
   max_claude_processes: 3
-  session_idle_timeout_minutes: 30
+  session_idle_timeout_minutes: 120
   session_expiry_minutes: 120
   reconnect_window_minutes: 5
   claude_hang_timeout_seconds: 120
