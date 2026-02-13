@@ -363,118 +363,425 @@ def create_bot(config: Config) -> discord.Client:
     # Expose for signal handler
     client._shutdown = _shutdown  # type: ignore[attr-defined]
 
+    # -------------------------------------------------------------------
+    # Non-blocking message processing state (per-channel)
+    # -------------------------------------------------------------------
+    _active_tasks: dict[int, asyncio.Task] = {}       # channel_id → running task
+    _message_queues: dict[int, asyncio.Queue] = {}    # channel_id → pending messages
+    _cancel_events: dict[int, asyncio.Event] = {}     # channel_id → cancel signal
+    _task_start_times: dict[int, float] = {}          # channel_id → monotonic start
+    MAX_QUEUE_SIZE = 5
+    STREAM_EDIT_INTERVAL = 3.0   # seconds between Discord message edits
+    STREAM_MSG_LIMIT = 1800      # chars before splitting to a new message
+
+    def _get_queue(channel_id: int) -> asyncio.Queue:
+        if channel_id not in _message_queues:
+            _message_queues[channel_id] = asyncio.Queue(maxsize=MAX_QUEUE_SIZE)
+        return _message_queues[channel_id]
+
+    def _get_cancel_event(channel_id: int) -> asyncio.Event:
+        if channel_id not in _cancel_events:
+            _cancel_events[channel_id] = asyncio.Event()
+        return _cancel_events[channel_id]
+
+    # -------------------------------------------------------------------
+    # Streaming gateway response → progressive Discord edits
+    # -------------------------------------------------------------------
+
+    async def _stream_gateway_response(
+        channel: discord.TextChannel,
+        channel_id_str: str,
+        user_text: str,
+        attachments: list[dict] | None,
+        cancel_event: asyncio.Event,
+    ) -> str | None:
+        """Stream gateway response with progressive Discord message edits.
+
+        Returns the complete response text, or None on error/cancel.
+        """
+        status_msg = await channel.send("*thinking...*")
+        accumulated = ""
+        last_edit = asyncio.get_event_loop().time()
+        sent_messages: list[discord.Message] = [status_msg]
+
+        try:
+            async for event in gw_client.stream_message(
+                channel_id=channel_id_str,
+                content=user_text,
+                attachments=attachments,
+            ):
+                if cancel_event.is_set():
+                    raise asyncio.CancelledError("User cancelled")
+
+                event_type = event.get("type")
+
+                if event_type == "chunk":
+                    accumulated += event.get("content", "")
+
+                    # Edit current message periodically
+                    now = asyncio.get_event_loop().time()
+                    if now - last_edit >= STREAM_EDIT_INTERVAL:
+                        # If accumulated content exceeds limit, finalize current
+                        # message and start a new one
+                        if len(accumulated) > STREAM_MSG_LIMIT:
+                            # Find a good split point
+                            split_at = accumulated.rfind("\n\n", 0, STREAM_MSG_LIMIT)
+                            if split_at <= 0:
+                                split_at = accumulated.rfind("\n", 0, STREAM_MSG_LIMIT)
+                            if split_at <= 0:
+                                split_at = STREAM_MSG_LIMIT
+
+                            finalized = accumulated[:split_at]
+                            accumulated = accumulated[split_at:].lstrip("\n")
+
+                            try:
+                                await sent_messages[-1].edit(content=finalized)
+                            except discord.HTTPException:
+                                pass
+                            status_msg = await channel.send("*...*")
+                            sent_messages.append(status_msg)
+                        else:
+                            display = accumulated + " \u2588"  # block cursor
+                            # Truncate display for Discord limit
+                            if len(display) > MAX_DISCORD_LEN:
+                                display = display[:SAFE_LEN] + "..."
+                            try:
+                                await sent_messages[-1].edit(content=display)
+                            except discord.HTTPException:
+                                pass
+                        last_edit = now
+
+                elif event_type == "response":
+                    # Final response — use the complete text
+                    final_text = event.get("content", accumulated)
+
+                    # Send remaining content as final message(s)
+                    # Delete the streaming status message and send clean final output
+                    for msg in sent_messages:
+                        try:
+                            await msg.delete()
+                        except discord.HTTPException:
+                            pass
+
+                    for chunk in split_message(final_text):
+                        await channel.send(chunk)
+
+                    return final_text
+
+        except asyncio.CancelledError:
+            # Clean up status message on cancel
+            for msg in sent_messages:
+                try:
+                    await msg.edit(content="*Cancelled.*")
+                except discord.HTTPException:
+                    pass
+            return None
+        except ContextTooLargeError:
+            raise  # let caller handle retry
+        except (TimeoutError, RuntimeError) as e:
+            for msg in sent_messages:
+                try:
+                    await msg.edit(content=f"*Error: {e}*")
+                except discord.HTTPException:
+                    pass
+            raise
+
+        return accumulated or None
+
+    # -------------------------------------------------------------------
+    # Direct CLI fallback with heartbeat status updates
+    # -------------------------------------------------------------------
+
+    async def _direct_cli_with_heartbeat(
+        channel: discord.TextChannel,
+        user_text: str,
+        channel_id_str: str,
+        cancel_event: asyncio.Event,
+    ) -> str | None:
+        """Invoke Claude CLI directly with periodic heartbeat messages."""
+        append_prompt = _get_context(config)
+        status_msg = await channel.send("*processing...*")
+        start = asyncio.get_event_loop().time()
+
+        # Run bridge.invoke in a background task so we can update status
+        invoke_task = asyncio.create_task(bridge.invoke(
+            message=user_text,
+            channel_id=channel_id_str,
+            append_prompt=append_prompt,
+        ))
+
+        try:
+            while not invoke_task.done():
+                # Check cancel
+                if cancel_event.is_set():
+                    invoke_task.cancel()
+                    try:
+                        await status_msg.edit(content="*Cancelled.*")
+                    except discord.HTTPException:
+                        pass
+                    return None
+
+                # Wait a bit, then update heartbeat
+                try:
+                    await asyncio.wait_for(asyncio.shield(invoke_task), timeout=15)
+                except asyncio.TimeoutError:
+                    pass  # not done yet — update heartbeat
+
+                if not invoke_task.done():
+                    elapsed = asyncio.get_event_loop().time() - start
+                    minutes = int(elapsed) // 60
+                    seconds = int(elapsed) % 60
+                    if minutes:
+                        time_str = f"{minutes}m {seconds}s"
+                    else:
+                        time_str = f"{seconds}s"
+                    try:
+                        await status_msg.edit(content=f"*still processing... ({time_str})*")
+                    except discord.HTTPException:
+                        pass
+
+            response = invoke_task.result()
+
+            # Delete status message and send response
+            try:
+                await status_msg.delete()
+            except discord.HTTPException:
+                pass
+
+            for chunk in split_message(response):
+                await channel.send(chunk)
+
+            return response
+
+        except asyncio.CancelledError:
+            invoke_task.cancel()
+            try:
+                await status_msg.edit(content="*Cancelled.*")
+            except discord.HTTPException:
+                pass
+            return None
+
+    # -------------------------------------------------------------------
+    # Background message processor
+    # -------------------------------------------------------------------
+
+    async def _process_message(
+        channel: discord.TextChannel,
+        channel_id: int,
+        author: str,
+        user_text: str,
+        attachments: list[dict],
+    ) -> None:
+        """Process a single message in the background. Handles retries and errors."""
+        channel_id_str = str(channel_id)
+        cancel_event = _get_cancel_event(channel_id)
+        cancel_event.clear()
+        _task_start_times[channel_id] = asyncio.get_event_loop().time()
+
+        response: str | None = None
+        try:
+            if gw_client and gw_client.connected:
+                response = await _stream_gateway_response(
+                    channel, channel_id_str, user_text,
+                    attachments if attachments else None, cancel_event,
+                )
+            else:
+                if attachments:
+                    logger.info("Attachments dropped — gateway unavailable")
+                response = await _direct_cli_with_heartbeat(
+                    channel, user_text, channel_id_str, cancel_event,
+                )
+
+        except ContextTooLargeError:
+            logger.warning("Context too large — clearing session and retrying")
+            if gw_client:
+                gw_client._sessions.pop(channel_id_str, None)
+                gw_client._save_sessions()
+            await channel.send("Session context was too large — starting fresh.")
+            # Retry once with clean session
+            try:
+                if gw_client and gw_client.connected:
+                    response = await _stream_gateway_response(
+                        channel, channel_id_str, user_text,
+                        attachments if attachments else None, cancel_event,
+                    )
+                else:
+                    append_prompt = _get_context(config)
+                    response = await bridge.invoke(
+                        message=user_text,
+                        channel_id=channel_id_str,
+                        append_prompt=append_prompt,
+                    )
+                    if response:
+                        for chunk in split_message(response):
+                            await channel.send(chunk)
+            except Exception:
+                logger.exception("Retry after context-too-large also failed")
+                await channel.send("Retry also failed. Try again in a moment.")
+
+        except TimeoutError:
+            await channel.send(
+                "Timed out waiting for Claude Code. Try again or simplify the request."
+            )
+        except RuntimeError as e:
+            logger.exception("Claude Code error")
+            await channel.send(f"Error from Claude Code: {e}")
+        except asyncio.CancelledError:
+            logger.info("Task cancelled for channel %d", channel_id)
+        except Exception:
+            logger.exception("Unexpected error processing message")
+            await channel.send("Something went wrong. Check the logs for details.")
+        finally:
+            _task_start_times.pop(channel_id, None)
+            _log_conversation(config, author, user_text, attachments, response)
+
+    # -------------------------------------------------------------------
+    # Task lifecycle — start, complete, drain queue
+    # -------------------------------------------------------------------
+
+    def _start_processing(
+        channel: discord.TextChannel,
+        channel_id: int,
+        author: str,
+        user_text: str,
+        attachments: list[dict],
+    ) -> None:
+        """Spawn a background task to process a message."""
+        task = asyncio.create_task(
+            _process_message(channel, channel_id, author, user_text, attachments)
+        )
+        _active_tasks[channel_id] = task
+        task.add_done_callback(lambda t: _on_task_done(channel, channel_id, t))
+
+    def _on_task_done(
+        channel: discord.TextChannel,
+        channel_id: int,
+        task: asyncio.Task,
+    ) -> None:
+        """Callback when a processing task finishes — drain queue if needed."""
+        _active_tasks.pop(channel_id, None)
+
+        # Check for exception we didn't handle
+        if not task.cancelled():
+            exc = task.exception()
+            if exc:
+                logger.error("Unhandled exception in message task: %s", exc)
+
+        # Drain next message from queue
+        queue = _message_queues.get(channel_id)
+        if queue and not queue.empty():
+            try:
+                next_item = queue.get_nowait()
+                _start_processing(
+                    channel, channel_id,
+                    next_item["author"],
+                    next_item["user_text"],
+                    next_item["attachments"],
+                )
+            except asyncio.QueueEmpty:
+                pass
+
+    # -------------------------------------------------------------------
+    # on_message — dispatch to background tasks
+    # -------------------------------------------------------------------
+
     @client.event
     async def on_message(message: discord.Message) -> None:
-        # Ignore own messages
         if message.author == client.user:
             return
-
-        # Only respond in configured channel
         if message.channel.id != config.discord.channel_id:
             return
-
-        # Only respond in configured guild
         if message.guild and message.guild.id != config.discord.guild_id:
             return
 
         user_text = message.content.strip()
-
-        # Download attachments (images, text files)
         attachments = await _download_attachments(message.attachments)
 
-        # Allow image-only messages (no text required if attachments present)
         if not user_text and not attachments:
             return
 
-        # Restart command — trigger graceful shutdown, launchd restarts
+        channel_id = message.channel.id
+
+        # --- Synchronous commands (not queued) ---
+
         if user_text == "!restart":
             logger.info("Restart requested by %s", message.author)
             await message.channel.send("Restarting. Back in ~10 seconds.")
             await _shutdown()
             return
 
-        # Reload command — rebuild context cache without restarting
         if user_text == "!reload":
             logger.info("Reload requested by %s", message.author)
             _refresh_context(config)
             await message.channel.send("Context cache rebuilt.")
             return
 
+        if user_text == "!cancel":
+            cancel_event = _get_cancel_event(channel_id)
+            cancel_event.set()
+            # Also send gateway-level cancel
+            if gw_client and gw_client.connected:
+                await gw_client.cancel_session(str(channel_id))
+            # Cancel the asyncio task
+            task = _active_tasks.get(channel_id)
+            if task and not task.done():
+                task.cancel()
+            # Clear the queue
+            queue = _message_queues.get(channel_id)
+            if queue:
+                while not queue.empty():
+                    try:
+                        queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        break
+            await message.add_reaction("\u2705")  # checkmark
+            return
+
+        if user_text == "!status":
+            task = _active_tasks.get(channel_id)
+            queue = _message_queues.get(channel_id)
+            queue_depth = queue.qsize() if queue else 0
+            if task and not task.done():
+                start_time = _task_start_times.get(channel_id)
+                if start_time:
+                    elapsed = asyncio.get_event_loop().time() - start_time
+                    minutes = int(elapsed) // 60
+                    seconds = int(elapsed) % 60
+                    time_str = f"{minutes}m {seconds}s" if minutes else f"{seconds}s"
+                else:
+                    time_str = "unknown"
+                await message.channel.send(
+                    f"Running ({time_str}). {queue_depth} queued."
+                )
+            else:
+                await message.channel.send("Idle.")
+            return
+
+        # --- Regular messages —  dispatch to background ---
+
         logger.info("Message from %s: %s%s", message.author, user_text[:100],
                      f" (+{len(attachments)} attachments)" if attachments else "")
 
-        # Show typing indicator while Claude processes
-        async with message.channel.typing():
-            response: str | None = None
+        task = _active_tasks.get(channel_id)
+        if task and not task.done():
+            # Already processing — queue this message
+            queue = _get_queue(channel_id)
             try:
-                # Route through gateway if connected, otherwise fall back to direct
-                if gw_client and gw_client.connected:
-                    response = await gw_client.send_message(
-                        channel_id=str(message.channel.id),
-                        content=user_text,
-                        attachments=attachments if attachments else None,
-                    )
-                else:
-                    if attachments:
-                        logger.info("Attachments dropped — gateway unavailable")
-                    append_prompt = _get_context(config)
-                    response = await bridge.invoke(
-                        message=user_text,
-                        channel_id=str(message.channel.id),
-                        append_prompt=append_prompt,
-                    )
-
-                # Send response, splitting if needed
-                for chunk in split_message(response):
-                    await message.channel.send(chunk)
-
-            except ContextTooLargeError:
-                logger.warning("Context too large — clearing session and retrying")
-                # Clear gateway session cache so retry starts fresh
-                if gw_client:
-                    gw_client._sessions.pop(str(message.channel.id), None)
-                    gw_client._save_sessions()
+                queue.put_nowait({
+                    "author": str(message.author),
+                    "user_text": user_text,
+                    "attachments": attachments,
+                })
+                await message.add_reaction("\u23f3")  # hourglass
+            except asyncio.QueueFull:
                 await message.channel.send(
-                    "Session context was too large — starting fresh."
+                    "Queue is full (5 messages). Wait for the current task to finish."
                 )
-                # Retry once with a clean session
-                try:
-                    if gw_client and gw_client.connected:
-                        response = await gw_client.send_message(
-                            channel_id=str(message.channel.id),
-                            content=user_text,
-                            attachments=attachments if attachments else None,
-                        )
-                    else:
-                        append_prompt = _get_context(config)
-                        response = await bridge.invoke(
-                            message=user_text,
-                            channel_id=str(message.channel.id),
-                            append_prompt=append_prompt,
-                        )
-                    for chunk in split_message(response):
-                        await message.channel.send(chunk)
-                except Exception:
-                    logger.exception("Retry after context-too-large also failed")
-                    await message.channel.send(
-                        "Retry also failed. Try again in a moment."
-                    )
-            except TimeoutError:
-                await message.channel.send(
-                    "Timed out waiting for Claude Code. Try again or simplify the request."
-                )
-            except RuntimeError as e:
-                logger.exception("Claude Code error")
-                await message.channel.send(f"Error from Claude Code: {e}")
-            except Exception:
-                logger.exception("Unexpected error processing message")
-                await message.channel.send(
-                    "Something went wrong. Check the logs for details."
-                )
-            finally:
-                # Log conversation exchange to daily log
-                _log_conversation(config, str(message.author), user_text,
-                                  attachments, response)
+        else:
+            _start_processing(
+                message.channel, channel_id,
+                str(message.author), user_text, attachments,
+            )
 
     return client
 

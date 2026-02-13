@@ -159,27 +159,8 @@ class GatewayClient:
             self._ws = None
         logger.info("Disconnected from gateway")
 
-    async def send_message(
-        self,
-        channel_id: str,
-        content: str,
-        attachments: list[dict] | None = None,
-    ) -> str:
-        """Send a message through the gateway and collect the full response.
-
-        Args:
-            channel_id: Discord channel ID (maps to a gateway session).
-            content: The user's message text.
-            attachments: Optional list of attachment dicts with keys:
-                filename, content_type, data (base64-encoded).
-
-        Returns:
-            The complete assistant response text.
-
-        Raises:
-            RuntimeError: If sending fails or the session can't be created.
-            TimeoutError: If no response within timeout.
-        """
+    async def _ensure_session(self, channel_id: str) -> str:
+        """Get or create a gateway session for a channel. Returns session_id."""
         if not self.connected:
             raise RuntimeError("Not connected to gateway")
 
@@ -190,7 +171,6 @@ class GatewayClient:
             if not await self._reconnect():
                 raise RuntimeError("Failed to reconnect to gateway (reader task dead)")
 
-        # Get or create a session for this channel
         session_id = self._sessions.get(channel_id)
         resumed = session_id is not None
         if not session_id:
@@ -201,6 +181,41 @@ class GatewayClient:
             logger.info("Resuming session %s for channel %s", session_id[:8], channel_id)
         else:
             logger.info("New session %s for channel %s", session_id[:8], channel_id)
+        return session_id
+
+    def _check_context_too_large(self, channel_id: str, text: str) -> None:
+        """Raise ContextTooLargeError if text looks like a context overflow message."""
+        text_lower = text.strip().lower()
+        if "prompt is too long" in text_lower or ("context" in text_lower and "too large" in text_lower):
+            logger.warning("Context too large for channel %s — clearing session", channel_id)
+            self._sessions.pop(channel_id, None)
+            self._save_sessions()
+            raise ContextTooLargeError(f"Session context exceeded limit: {text.strip()}")
+
+    async def send_message(
+        self,
+        channel_id: str,
+        content: str,
+        attachments: list[dict] | None = None,
+        timeout: int = 1800,
+    ) -> str:
+        """Send a message through the gateway and collect the full response.
+
+        Args:
+            channel_id: Discord channel ID (maps to a gateway session).
+            content: The user's message text.
+            attachments: Optional list of attachment dicts with keys:
+                filename, content_type, data (base64-encoded).
+            timeout: Max seconds to wait for a response (default 1800).
+
+        Returns:
+            The complete assistant response text.
+
+        Raises:
+            RuntimeError: If sending fails or the session can't be created.
+            TimeoutError: If no response within timeout.
+        """
+        session_id = await self._ensure_session(channel_id)
 
         # Set up response queue
         queue: asyncio.Queue = asyncio.Queue()
@@ -223,51 +238,124 @@ class GatewayClient:
         full_response = []
         try:
             while True:
-                event = await asyncio.wait_for(queue.get(), timeout=300)
+                event = await asyncio.wait_for(queue.get(), timeout=timeout)
                 event_type = event.get("type")
 
                 if event_type == "chunk":
                     full_response.append(event.get("content", ""))
 
                 elif event_type == "response":
-                    # Complete response — use result text
                     result = event.get("content", "".join(full_response))
-                    # Check if the "response" is actually a context-too-large error
-                    # that the gateway passed through as normal content
-                    result_lower = result.strip().lower()
-                    if "prompt is too long" in result_lower or ("context" in result_lower and "too large" in result_lower):
-                        logger.warning("Context too large (returned as response content) for channel %s", channel_id)
-                        self._sessions.pop(channel_id, None)
-                        self._save_sessions()
-                        raise ContextTooLargeError(f"Session context exceeded limit: {result.strip()}")
+                    self._check_context_too_large(channel_id, result)
                     return result
 
                 elif event_type == "error":
                     code = event.get("code", "unknown")
                     error_msg = event.get("message", "Unknown error")
 
-                    # Session not found — clear cached session and retry
                     if code in ("session_not_found", "session_expired"):
                         self._sessions.pop(channel_id, None)
                         self._save_sessions()
                         raise RuntimeError(f"Session error ({code}): {error_msg}")
 
-                    # Context too large — session exceeded Claude's prompt limit
-                    error_lower = error_msg.lower()
-                    if "prompt is too long" in error_lower or ("context" in error_lower and "too large" in error_lower):
-                        logger.warning("Context too large for channel %s — clearing session", channel_id)
-                        self._sessions.pop(channel_id, None)
-                        self._save_sessions()
-                        raise ContextTooLargeError(f"Session context exceeded limit: {error_msg}")
-
+                    self._check_context_too_large(channel_id, error_msg)
                     raise RuntimeError(f"Gateway error ({code}): {error_msg}")
 
                 else:
                     logger.debug("Ignoring unknown event type in response stream: %s", event_type)
         except asyncio.TimeoutError:
-            raise TimeoutError("Gateway response timed out after 300s")
+            raise TimeoutError(f"Gateway response timed out after {timeout}s")
         finally:
             self._response_queues.pop(session_id, None)
+
+    async def stream_message(
+        self,
+        channel_id: str,
+        content: str,
+        attachments: list[dict] | None = None,
+        timeout: int = 1800,
+    ) -> AsyncIterator[dict]:
+        """Send a message and yield raw events as they arrive.
+
+        Yields dicts with "type" key: "chunk" (partial content) or
+        "response" (final complete content). Raises on errors.
+
+        Args:
+            channel_id: Discord channel ID (maps to a gateway session).
+            content: The user's message text.
+            attachments: Optional list of attachment dicts.
+            timeout: Max seconds to wait between events (default 1800).
+        """
+        session_id = await self._ensure_session(channel_id)
+
+        queue: asyncio.Queue = asyncio.Queue()
+        self._response_queues[session_id] = queue
+
+        msg = json.dumps({
+            "type": "message",
+            "session_id": session_id,
+            "content": content,
+            "attachments": attachments or [],
+        })
+        try:
+            await self._ws.send(msg)
+        except websockets.exceptions.ConnectionClosed:
+            self._connected = False
+            raise RuntimeError("Gateway connection lost — retrying next message")
+
+        try:
+            while True:
+                event = await asyncio.wait_for(queue.get(), timeout=timeout)
+                event_type = event.get("type")
+
+                if event_type == "chunk":
+                    yield event
+
+                elif event_type == "response":
+                    result = event.get("content", "")
+                    self._check_context_too_large(channel_id, result)
+                    yield event
+                    return
+
+                elif event_type == "error":
+                    code = event.get("code", "unknown")
+                    error_msg = event.get("message", "Unknown error")
+
+                    if code in ("session_not_found", "session_expired"):
+                        self._sessions.pop(channel_id, None)
+                        self._save_sessions()
+                        raise RuntimeError(f"Session error ({code}): {error_msg}")
+
+                    self._check_context_too_large(channel_id, error_msg)
+                    raise RuntimeError(f"Gateway error ({code}): {error_msg}")
+
+                else:
+                    logger.debug("Ignoring unknown event type in stream: %s", event_type)
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"Gateway stream timed out after {timeout}s")
+        finally:
+            self._response_queues.pop(session_id, None)
+
+    async def cancel_session(self, channel_id: str) -> bool:
+        """Send a cancel request for the active session on a channel.
+
+        Returns True if cancel was sent, False if no session or not connected.
+        """
+        if not self.connected or not self._ws:
+            return False
+        session_id = self._sessions.get(channel_id)
+        if not session_id:
+            return False
+        try:
+            await self._ws.send(json.dumps({
+                "type": "cancel",
+                "session_id": session_id,
+            }))
+            logger.info("Sent cancel for session %s (channel %s)", session_id[:8], channel_id)
+            return True
+        except websockets.exceptions.ConnectionClosed:
+            self._connected = False
+            return False
 
     async def _create_session(self, channel_id: str) -> str:
         """Create a new gateway session for a Discord channel."""

@@ -32,7 +32,7 @@ class DiscordConfig:
 @dataclass
 class ClaudeConfig:
     path: str
-    timeout_seconds: int = 300
+    timeout_seconds: int = 1800
     session_expiry_minutes: int = 30
 
 
