@@ -1,0 +1,95 @@
+# MEMORY.md - Agent Memory
+
+## System Configuration
+
+### ClawCode Config
+
+**Project directory:** `~/clawcode/`
+- Config: `config/config.yaml`
+- Bot code: `bot/`
+- Skills: `skills/`
+- Identity layer: `SOUL.md` (philosophy), `STYLE.md` (voice), `IDENTITY.md` (presentation), `USER.md` (user profile)
+- Memory: `memory/` (daily logs), `MEMORY.md`
+- CLI wrapper: `cli/clawcode`
+
+---
+
+## Standard Operating Procedures
+
+### Time & Date Format
+
+**Time Zone:** US Central Time (America/Chicago) with daylight saving time changes
+**Time Format:** 24-hour format (e.g., 14:30, 19:22)
+**Date Format:** YYYY-MM-DD (ISO 8601) when technical; human-readable when appropriate
+
+---
+
+## Documentation Maintenance
+
+### When making system changes
+1. Commit and push changes to the clawcode repo
+2. Update relevant documentation
+3. Document new dependencies and troubleshooting steps
+
+### Skill setup docs
+When adding a new skill, ensure its `SKILL.md` frontmatter includes `metadata.clawcode.requires.bins` listing all required CLI tools. This powers `clawcode doctor` and `scripts/setup.sh` for automated dependency checking and first-run setup. Update `config/mcp-servers.yaml` if the skill depends on an MCP server.
+
+---
+
+## Scheduling
+
+### Workflow
+Schedules are macOS launchd agents, independent of the Discord bot process.
+
+- **Source of truth:** `config/schedules.yaml`
+- **Format:** `name`, `cron` (5-field), `prompt`, `enabled`
+- **After editing:** run `scripts/schedule-sync.py` to sync to launchd
+- **Agents named:** `com.clawcode.schedule.<name>`
+- **Runner:** `scripts/schedule-runner.py <name>` — invokes Claude CLI, posts to Discord via REST API
+- **Logs:** `data/logs/schedule-<name>.log`
+- **CLI:** `clawcode schedule sync|list|logs <name>`
+
+### Key Points
+- Schedules fire even if the bot is down
+- Sync is idempotent: deletes all agents, recreates from YAML
+- Step intervals (e.g., `*/30`) use launchd `StartInterval`; specific times use `StartCalendarInterval`
+
+---
+
+## Planned Features
+
+Add planned features here as they come up.
+
+---
+
+## Completed Features
+
+Track completed features here with dates.
+
+---
+
+## Skills Available
+
+### Calendar Integration - icalpal
+
+The **icalpal** skill provides macOS Calendar/Reminders access via CLI.
+
+**Tool:** Uses `icalpal` CLI tool (installed via Homebrew)
+
+### Apple Reminders - remindctl
+
+The **apple-reminders** skill manages Apple Reminders via `remindctl` CLI.
+
+**Tool:** Uses `remindctl` CLI tool (installed via Homebrew)
+
+### Scheduler - launchd
+
+The **scheduler** skill manages recurring tasks via macOS launchd agents.
+
+**Tool:** Edits `config/schedules.yaml` + runs `scripts/schedule-sync.py`
+
+### Gmail - gmail-mcp
+
+The **gmail** skill provides full Gmail access via MCP.
+
+**Tool:** `gmail-mcp` MCP server. Draft-first for new emails — always confirm before sending.

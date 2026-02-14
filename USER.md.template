@@ -1,0 +1,38 @@
+# USER.md - User Profile
+
+## Basic Info
+- **Name:** Your Name
+- **Preferred address:** First Name
+- **Timezone:** America/Chicago
+- **Location:** City, State
+
+## Professional Background
+- Current role or status
+
+## Interests & Hobbies
+- List your interests here
+
+## Goals for ClawCode
+
+Your vision for what ClawCode should help you accomplish.
+
+- **Organization:** Help manage daily complexity
+- **Automation:** Identify repetitive tasks that can be automated
+- **Integration:** Connect tools, data, and workflows
+
+## Preferences
+
+### Communication Style
+- **Candid and plain** — Direct communication, backed by facts
+- **Accuracy over speed** — Don't guess; research or say "I don't know"
+- **No assumptions** — Ask or verify rather than assume
+
+### Interaction Style
+- **Questions ≠ Commands**: When asked a question, suggest options but don't act
+- Default to proposing approaches and waiting for confirmation
+- Exception: Explicit commands can proceed directly
+
+### Task Management
+- **Always create tasks** in Obsidian vault at: `tasks/active/`
+- Full path: `OBSIDIAN_VAULT/tasks/active/`
+- Use Markdown format with checkboxes for action items
