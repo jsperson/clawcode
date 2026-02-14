@@ -22,6 +22,10 @@ from typing import AsyncIterator, Callable
 
 logger = logging.getLogger(__name__)
 
+# 16 MB — Claude CLI can emit very large JSON lines (OCR results, tool output, etc.)
+# The default asyncio StreamReader limit is 64 KB, which causes LimitOverrunError.
+_STREAM_LIMIT = 16 * 1024 * 1024
+
 
 # ---------------------------------------------------------------------------
 # Claude process wrapper
@@ -290,6 +294,7 @@ class ClaudePool:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            limit=_STREAM_LIMIT,
             cwd=self._project_dir,
             env=env,
             preexec_fn=os.setpgrp,  # Own process group for clean kill
