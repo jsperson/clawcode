@@ -7,8 +7,10 @@ import base64
 import json
 import logging
 import os
+import shutil
 import signal
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -310,11 +312,36 @@ def create_bot(config: Config) -> discord.Client:
         except Exception:
             logger.exception("Error sending startup message")
 
+        # Start in-process heartbeat loop
+        nonlocal _heartbeat_task
+        if config.heartbeat.in_process.enabled:
+            # Seed HEARTBEAT.md from template if it doesn't exist
+            hb_path = Path(config.paths.project_dir) / "HEARTBEAT.md"
+            hb_template = Path(config.paths.project_dir) / "HEARTBEAT.md.template"
+            if not hb_path.exists() and hb_template.exists():
+                shutil.copy2(hb_template, hb_path)
+                logger.info("Seeded HEARTBEAT.md from template")
+
+            _heartbeat_task = asyncio.create_task(_heartbeat_loop())
+            logger.info("In-process heartbeat started (interval=%dm)",
+                        config.heartbeat.in_process.interval_minutes)
+
     async def _shutdown() -> None:
         """Run cleanup before the bot process exits."""
+        nonlocal _heartbeat_task
         logger.info("Bot shutting down — running cleanup")
 
-        # 0. Notify Discord channel before closing
+        # 0a. Cancel heartbeat loop
+        if _heartbeat_task and not _heartbeat_task.done():
+            _heartbeat_task.cancel()
+            try:
+                await _heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            logger.info("Heartbeat loop stopped")
+            _heartbeat_task = None
+
+        # 0b. Notify Discord channel before closing
         try:
             if not client.is_closed():
                 channel = await client.fetch_channel(config.discord.channel_id)
@@ -373,6 +400,13 @@ def create_bot(config: Config) -> discord.Client:
     MAX_QUEUE_SIZE = 5
     STREAM_EDIT_INTERVAL = 3.0   # seconds between Discord message edits
     STREAM_MSG_LIMIT = 1800      # chars before splitting to a new message
+
+    # -------------------------------------------------------------------
+    # Heartbeat state
+    # -------------------------------------------------------------------
+    _last_user_message_time: float = 0.0   # monotonic, updated on every user message
+    _heartbeat_task: asyncio.Task | None = None
+    _heartbeat_count: int = 0              # cycles since startup, for full-scan cadence
 
     def _get_queue(channel_id: int) -> asyncio.Queue:
         if channel_id not in _message_queues:
@@ -562,6 +596,137 @@ def create_bot(config: Config) -> discord.Client:
             return None
 
     # -------------------------------------------------------------------
+    # In-process heartbeat
+    # -------------------------------------------------------------------
+
+    def _build_heartbeat_prompt(is_full_scan: bool) -> str:
+        """Build the prompt injected for a heartbeat cycle."""
+        scan_type = "full scan" if is_full_scan else "lightweight"
+        heartbeat_path = Path(config.paths.project_dir) / "HEARTBEAT.md"
+        return (
+            f"[HEARTBEAT — {scan_type}]\n"
+            f"Read {heartbeat_path} and execute the checks for this scan tier.\n"
+            f"Scan type: {scan_type}\n"
+            f"Current time: {datetime.now(TZ).strftime('%Y-%m-%d %H:%M %Z')}\n\n"
+            "Response rules:\n"
+            "- If nothing actionable, respond with EXACTLY: [heartbeat ok]\n"
+            "- If actionable items found, respond with a concise report.\n"
+            "- Do NOT post to Discord yourself — the bot handles output routing.\n"
+            "- Keep total execution under 2-3 minutes.\n"
+        )
+
+    async def _heartbeat_cli_invoke(prompt: str, channel_id_str: str) -> str | None:
+        """Invoke Claude CLI for a heartbeat cycle. Returns response text."""
+        append_prompt = _get_context(config)
+        try:
+            response = await bridge.invoke(
+                message=prompt,
+                channel_id=channel_id_str,
+                append_prompt=append_prompt,
+                priority=True,  # shares user session via --resume
+            )
+            return response
+        except (TimeoutError, RuntimeError, ContextTooLargeError) as e:
+            logger.warning("Heartbeat CLI invoke failed: %s", e)
+            return None
+
+    def _in_active_hours() -> bool:
+        """Check if current time is within configured active hours."""
+        now = datetime.now(TZ)
+        hb_cfg = config.heartbeat.in_process
+        try:
+            start_h, start_m = map(int, hb_cfg.active_hours_start.split(":"))
+            end_h, end_m = map(int, hb_cfg.active_hours_end.split(":"))
+        except (ValueError, AttributeError):
+            return True  # default to active if parsing fails
+        current_minutes = now.hour * 60 + now.minute
+        start_minutes = start_h * 60 + start_m
+        end_minutes = end_h * 60 + end_m
+        return start_minutes <= current_minutes < end_minutes
+
+    async def _heartbeat_loop() -> None:
+        """Background heartbeat loop — runs inside the bot's event loop."""
+        nonlocal _heartbeat_count
+
+        hb_cfg = config.heartbeat.in_process
+        interval = hb_cfg.interval_minutes * 60
+        full_scan_every = max(1, hb_cfg.full_scan_interval_minutes // hb_cfg.interval_minutes)
+        quiet_period = hb_cfg.quiet_after_message_minutes * 60
+        channel_id = config.discord.channel_id
+        channel_id_str = str(channel_id)
+
+        # Wait one full interval before first heartbeat
+        logger.info(
+            "Heartbeat loop started — interval=%dm, full_scan_every=%d cycles, quiet=%dm",
+            hb_cfg.interval_minutes, full_scan_every, hb_cfg.quiet_after_message_minutes,
+        )
+        await asyncio.sleep(interval)
+
+        while True:
+            try:
+                # Check active hours
+                if not _in_active_hours():
+                    logger.debug("Heartbeat skipped — outside active hours")
+                    await asyncio.sleep(interval)
+                    continue
+
+                # Check quiet period
+                now_mono = time.monotonic()
+                if _last_user_message_time > 0 and (now_mono - _last_user_message_time) < quiet_period:
+                    logger.debug("Heartbeat skipped — quiet period (user messaged recently)")
+                    await asyncio.sleep(interval)
+                    continue
+
+                # Determine scan type
+                _heartbeat_count += 1
+                is_full_scan = (_heartbeat_count % full_scan_every) == 0
+
+                scan_label = "full scan" if is_full_scan else "lightweight"
+                logger.info("Heartbeat cycle #%d (%s)", _heartbeat_count, scan_label)
+
+                prompt = _build_heartbeat_prompt(is_full_scan)
+
+                # Inject into the per-channel queue system
+                await _inject_heartbeat(channel_id, prompt)
+
+            except asyncio.CancelledError:
+                logger.info("Heartbeat loop cancelled")
+                return
+            except Exception:
+                logger.exception("Heartbeat loop error — will retry next cycle")
+
+            try:
+                await asyncio.sleep(interval)
+            except asyncio.CancelledError:
+                logger.info("Heartbeat loop cancelled")
+                return
+
+    async def _inject_heartbeat(channel_id: int, prompt: str) -> None:
+        """Inject a heartbeat into the message processing pipeline."""
+        channel_id_str = str(channel_id)
+        task = _active_tasks.get(channel_id)
+
+        if task and not task.done():
+            # Channel is busy — queue the heartbeat
+            queue = _get_queue(channel_id)
+            try:
+                queue.put_nowait({
+                    "author": "heartbeat",
+                    "user_text": prompt,
+                    "attachments": [],
+                })
+                logger.debug("Heartbeat queued (channel busy)")
+            except asyncio.QueueFull:
+                logger.debug("Heartbeat skipped — queue full")
+        else:
+            # Channel idle — process directly
+            try:
+                channel = await client.fetch_channel(channel_id)
+                _start_processing(channel, channel_id, "heartbeat", prompt, [])
+            except Exception:
+                logger.warning("Failed to inject heartbeat — could not fetch channel")
+
+    # -------------------------------------------------------------------
     # Background message processor
     # -------------------------------------------------------------------
 
@@ -574,12 +739,45 @@ def create_bot(config: Config) -> discord.Client:
     ) -> None:
         """Process a single message in the background. Handles retries and errors."""
         channel_id_str = str(channel_id)
+        is_heartbeat = (author == "heartbeat")
+
         cancel_event = _get_cancel_event(channel_id)
-        cancel_event.clear()
         _task_start_times[channel_id] = asyncio.get_event_loop().time()
 
         response: str | None = None
         try:
+            if is_heartbeat:
+                # Heartbeat path — no status messages, no streaming
+                response = await _heartbeat_cli_invoke(user_text, channel_id_str)
+
+                if response:
+                    stripped = response.strip()
+                    if "[heartbeat ok]" in stripped.lower():
+                        # Silent — nothing actionable
+                        logger.info("Heartbeat: ok (silent)")
+                    else:
+                        # Actionable — post to Discord with emoji indicator
+                        emoji = config.heartbeat.in_process.emoji_indicator
+                        first_msg = None
+                        for chunk in split_message(response):
+                            msg = await channel.send(chunk)
+                            if first_msg is None:
+                                first_msg = msg
+                        if first_msg:
+                            try:
+                                await first_msg.add_reaction(emoji)
+                            except discord.HTTPException:
+                                pass
+                        logger.info("Heartbeat: actionable output posted (%d chars)", len(response))
+                        # Log actionable heartbeats to daily log
+                        _log_conversation(config, "heartbeat", "(heartbeat cycle)", [], response)
+                else:
+                    logger.warning("Heartbeat: no response from CLI")
+                return  # skip the finally log for heartbeats (logged above if actionable)
+
+            # --- Normal user message path ---
+            cancel_event.clear()
+
             if gw_client and gw_client.connected:
                 response = await _stream_gateway_response(
                     channel, channel_id_str, user_text,
@@ -620,20 +818,26 @@ def create_bot(config: Config) -> discord.Client:
                 await channel.send("Retry also failed. Try again in a moment.")
 
         except TimeoutError:
-            await channel.send(
-                "Timed out waiting for Claude Code. Try again or simplify the request."
-            )
+            if not is_heartbeat:
+                await channel.send(
+                    "Timed out waiting for Claude Code. Try again or simplify the request."
+                )
         except RuntimeError as e:
-            logger.exception("Claude Code error")
-            await channel.send(f"Error from Claude Code: {e}")
+            if not is_heartbeat:
+                logger.exception("Claude Code error")
+                await channel.send(f"Error from Claude Code: {e}")
+            else:
+                logger.warning("Heartbeat runtime error: %s", e)
         except asyncio.CancelledError:
             logger.info("Task cancelled for channel %d", channel_id)
         except Exception:
             logger.exception("Unexpected error processing message")
-            await channel.send("Something went wrong. Check the logs for details.")
+            if not is_heartbeat:
+                await channel.send("Something went wrong. Check the logs for details.")
         finally:
             _task_start_times.pop(channel_id, None)
-            _log_conversation(config, author, user_text, attachments, response)
+            if not is_heartbeat:
+                _log_conversation(config, author, user_text, attachments, response)
 
     # -------------------------------------------------------------------
     # Task lifecycle — start, complete, drain queue
@@ -687,12 +891,17 @@ def create_bot(config: Config) -> discord.Client:
 
     @client.event
     async def on_message(message: discord.Message) -> None:
+        nonlocal _last_user_message_time
+
         if message.author == client.user:
             return
         if message.channel.id != config.discord.channel_id:
             return
         if message.guild and message.guild.id != config.discord.guild_id:
             return
+
+        # Track last user message time for heartbeat quiet period
+        _last_user_message_time = time.monotonic()
 
         user_text = message.content.strip()
         attachments = await _download_attachments(message.attachments)

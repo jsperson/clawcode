@@ -81,6 +81,28 @@ class MCPConfig:
 
 
 @dataclass
+class HeartbeatInProcessConfig:
+    enabled: bool = True
+    interval_minutes: int = 30
+    full_scan_interval_minutes: int = 120
+    quiet_after_message_minutes: int = 5
+    active_hours_start: str = "07:00"
+    active_hours_end: str = "22:00"
+    emoji_indicator: str = "\U0001f493"  # 💓
+
+
+@dataclass
+class HeartbeatLaunchdConfig:
+    interval_hours: int = 6
+
+
+@dataclass
+class HeartbeatConfig:
+    in_process: HeartbeatInProcessConfig = field(default_factory=HeartbeatInProcessConfig)
+    launchd: HeartbeatLaunchdConfig = field(default_factory=HeartbeatLaunchdConfig)
+
+
+@dataclass
 class GatewayConfig:
     """Gateway process configuration (optional — only needed when gateway is running)."""
 
@@ -106,6 +128,7 @@ class Config:
     file_watch: FileWatchConfig
     mcp: MCPConfig = field(default_factory=MCPConfig)
     gateway: GatewayConfig = field(default_factory=GatewayConfig)
+    heartbeat: HeartbeatConfig = field(default_factory=HeartbeatConfig)
 
     @classmethod
     def load(cls, config_path: str | Path | None = None) -> Config:
@@ -214,6 +237,28 @@ class Config:
             enabled=os.environ.get("GATEWAY_ENABLED", str(gw_raw.get("enabled", False))).lower() in ("true", "1", "yes"),
         )
 
+        # Heartbeat configuration (optional)
+        hb_raw = raw.get("heartbeat", {}) or {}
+        hb_ip_raw = hb_raw.get("in_process", {}) or {}
+        hb_active = hb_ip_raw.get("active_hours", {}) or {}
+        hb_in_process = HeartbeatInProcessConfig(
+            enabled=hb_ip_raw.get("enabled", True),
+            interval_minutes=int(hb_ip_raw.get("interval_minutes", 30)),
+            full_scan_interval_minutes=int(hb_ip_raw.get("full_scan_interval_minutes", 120)),
+            quiet_after_message_minutes=int(hb_ip_raw.get("quiet_after_message_minutes", 5)),
+            active_hours_start=str(hb_active.get("start", "07:00")),
+            active_hours_end=str(hb_active.get("end", "22:00")),
+            emoji_indicator=hb_ip_raw.get("emoji_indicator", "\U0001f493"),
+        )
+        hb_ld_raw = hb_raw.get("launchd", {}) or {}
+        hb_launchd = HeartbeatLaunchdConfig(
+            interval_hours=int(hb_ld_raw.get("interval_hours", 6)),
+        )
+        heartbeat = HeartbeatConfig(
+            in_process=hb_in_process,
+            launchd=hb_launchd,
+        )
+
         return cls(
             discord=discord,
             claude=claude,
@@ -222,4 +267,5 @@ class Config:
             file_watch=file_watch,
             mcp=mcp,
             gateway=gateway,
+            heartbeat=heartbeat,
         )

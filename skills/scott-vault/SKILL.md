@@ -18,6 +18,7 @@ iCloud-synced across devices. ~1,450 markdown files, ~2.8GB total.
 
 ```
 scott/
+├── Inbox/                # Quick captures, unsorted items, triage landing zone
 ├── Ideas/                # Early-stage captures, reference links, things to explore
 ├── Projects/             # Active work (folder per project, with attachments/)
 │   ├── ATI/              # Consulting (Tiber Solutions)
@@ -58,6 +59,7 @@ scott/
 
 | Content type | Destination |
 |---|---|
+| Quick capture / unsorted | `Inbox/` |
 | Simple task/todo | Apple Reminders via `remindctl` or Siri |
 | Active work with deadlines | `Projects/<ProjectName>/` (create folder) |
 | Research link or idea | `Ideas/` |

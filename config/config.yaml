@@ -28,6 +28,19 @@ gateway:
   reconnect_window_minutes: 5
   claude_hang_timeout_seconds: 120
 
+heartbeat:
+  in_process:
+    enabled: true
+    interval_minutes: 30
+    full_scan_interval_minutes: 120
+    quiet_after_message_minutes: 5
+    active_hours:
+      start: "07:00"
+      end: "22:00"
+    emoji_indicator: "\U0001f493"
+  launchd:
+    interval_hours: 6
+
 file_watch:
   enabled: false
   debounce_seconds: 5

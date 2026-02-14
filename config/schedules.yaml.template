@@ -7,17 +7,10 @@ schedules:
   reminder_check:
     cron: "0 * * * *"
     prompt: "Check remindctl for overdue and due-today items. Surface anything that needs attention."
-    enabled: true
+    enabled: false  # subsumed by in-process heartbeat lightweight checks
 
-  end_of_day:
-    cron: "0 18 * * *"
-    prompt: "End of day: summarize what happened, outstanding items, write to daily log"
-    enabled: true
-
-  weekly_review:
-    cron: "0 16 * * 0"
-    prompt: "Weekly review: summarize this week's daily logs, suggest items to promote to MEMORY.md"
-    enabled: true
+  # end_of_day: migrated to in-process heartbeat standing orders
+  # weekly_review: migrated to in-process heartbeat (Phase 2 self-improvement)
 
   weekly_trends:
     cron: "0 3 * * 1"
@@ -58,11 +51,4 @@ schedules:
     script: "bash ~/clawcode/scripts/backup.sh"
     enabled: true
 
-  heartbeat:
-    cron: "0 */4 * * *"
-    prompt: >
-      Read CLAWCODE_DIR/HEARTBEAT.md and execute any active tasks listed there.
-      Report the result of each task briefly.
-      After all tasks are complete (or if there are no active tasks), end your response with
-      exactly this line: 🟢 Heartbeat OK
-    enabled: true
+  # heartbeat: migrated to in-process heartbeat loop in bot/main.py
