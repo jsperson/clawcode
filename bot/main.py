@@ -257,6 +257,38 @@ def _save_attachment(filename: str, data: bytes) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+_VAULT_REVIEWS_DIR = Path.home() / (
+    "Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
+    "/Projects/ClawCode-Autonomy/reviews"
+)
+
+
+def _log_heartbeat_to_vault(response: str, is_silent: bool) -> None:
+    """Append heartbeat output to a daily log in the Obsidian vault."""
+    try:
+        _VAULT_REVIEWS_DIR.mkdir(parents=True, exist_ok=True)
+        now = datetime.now(TZ)
+        log_path = _VAULT_REVIEWS_DIR / f"{now.strftime('%Y-%m-%d')}-heartbeat.md"
+
+        timestamp = now.strftime("%H:%M")
+        if is_silent:
+            entry = f"### {timestamp} — ok (silent)\n\n"
+        else:
+            entry = f"### {timestamp}\n\n{response}\n\n---\n\n"
+
+        # Create file with header if new, otherwise append
+        if not log_path.exists():
+            header = f"# Heartbeat Log — {now.strftime('%Y-%m-%d')}\n\n"
+            log_path.write_text(header + entry, encoding="utf-8")
+        else:
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(entry)
+
+        logger.debug("Heartbeat logged to vault: %s", log_path.name)
+    except Exception:
+        logger.debug("Failed to log heartbeat to vault", exc_info=True)
+
+
 def create_bot(config: Config) -> discord.Client:
     """Create and configure the Discord bot client."""
     intents = discord.Intents.default()
@@ -798,8 +830,12 @@ def create_bot(config: Config) -> discord.Client:
 
                 if response:
                     stripped = response.strip()
-                    if "[heartbeat ok]" in stripped.lower():
-                        # Silent — nothing actionable
+                    is_silent = "[heartbeat ok]" in stripped.lower()
+
+                    # Log ALL heartbeat output to Obsidian vault
+                    _log_heartbeat_to_vault(response, is_silent)
+
+                    if is_silent:
                         logger.info("Heartbeat: ok (silent)")
                     else:
                         # Actionable — post to Discord with emoji indicator
