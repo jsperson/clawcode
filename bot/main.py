@@ -157,6 +157,17 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_ATTACHMENTS = 5
 ATTACHMENT_DIR = Path("/tmp/clawcode-attachments")
 
+_INBOUND_NOTES_DIR = Path.home() / (
+    "Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
+    "/Personal Notes/Inbound Notes"
+)
+
+
+def _is_notes_request(text: str) -> bool:
+    """Check if the message is asking to process handwritten notes."""
+    lower = text.lower()
+    return "process" in lower and "note" in lower
+
 
 def _detect_image_type(data: bytes) -> str | None:
     """Detect image type from magic bytes. Returns MIME type or None."""
@@ -228,22 +239,24 @@ async def _download_attachments(discord_attachments: list) -> list[dict]:
     return results
 
 
-def _save_attachment(filename: str, data: bytes) -> str | None:
-    """Save a binary attachment to /tmp/clawcode-attachments/. Returns the path or None."""
+def _save_attachment(
+    filename: str, data: bytes, dest_dir: Path = ATTACHMENT_DIR
+) -> str | None:
+    """Save an attachment to the given directory. Returns the path or None."""
     try:
-        ATTACHMENT_DIR.mkdir(parents=True, exist_ok=True)
+        dest_dir.mkdir(parents=True, exist_ok=True)
         # Sanitize filename — keep only the basename, no path traversal
         safe_name = Path(filename).name
         if not safe_name:
             safe_name = "attachment"
-        dest = ATTACHMENT_DIR / safe_name
+        dest = dest_dir / safe_name
         # Avoid collisions — append counter if file exists
         if dest.exists():
             stem = dest.stem
             suffix = dest.suffix
             i = 1
             while dest.exists():
-                dest = ATTACHMENT_DIR / f"{stem}_{i}{suffix}"
+                dest = dest_dir / f"{stem}_{i}{suffix}"
                 i += 1
         dest.write_bytes(data)
         return str(dest)
@@ -986,7 +999,33 @@ def create_bot(config: Config) -> discord.Client:
         _last_user_message_time = time.monotonic()
 
         user_text = message.content.strip()
-        attachments = await _download_attachments(message.attachments)
+
+        # Notes mode: save images to Inbound Notes for the notes-inbound skill
+        notes_mode = _is_notes_request(user_text) and bool(message.attachments)
+
+        if notes_mode:
+            saved_files = []
+            for att in message.attachments[:MAX_ATTACHMENTS]:
+                if att.size > MAX_FILE_SIZE:
+                    continue
+                try:
+                    data = await att.read()
+                except Exception:
+                    continue
+                if _detect_image_type(data):
+                    saved = _save_attachment(att.filename, data, dest_dir=_INBOUND_NOTES_DIR)
+                    if saved:
+                        saved_files.append(saved)
+            if saved_files:
+                paths = ", ".join(saved_files)
+                user_text = (
+                    f"[Attachments saved to Inbound Notes: {paths}] "
+                    "Process these notes using the notes-inbound skill.\n\n"
+                    + user_text
+                )
+            attachments: list[dict] = []  # don't send inline — skill reads from disk
+        else:
+            attachments = await _download_attachments(message.attachments)
 
         if not user_text and not attachments:
             return

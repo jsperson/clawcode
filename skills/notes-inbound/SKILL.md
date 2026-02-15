@@ -57,9 +57,7 @@ Each entry in `Personal-Notes-YYYY.md`:
 
 📎 **Source**: [[zzArchivedPDFs/filename|Original Note]]
 
-### OCR Content
-
-[OCR text...]
+[Transcribed text...]
 
 ---
 ```
