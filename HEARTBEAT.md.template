@@ -29,8 +29,8 @@ These rules are immutable. You may NOT remove or weaken this section via self-mo
 ## Scan Tiers
 
 ### Lightweight Checks (every cycle)
-- Check Apple Reminders for overdue or due-today items
-- Check calendar for upcoming events in next 2 hours
+- Check Apple Reminders for overdue or due-today items — run: `~/clawcode/scripts/icalpal-query.sh --compact uncompletedTasks -o json`
+- Check calendar for upcoming events in next 2 hours — run: `~/clawcode/scripts/icalpal-query.sh --compact eventsToday -o json`
 - Check if daily digest was generated today
 
 ### Full Scan Checks (every full_scan_interval cycle)
