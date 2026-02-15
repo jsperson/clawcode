@@ -1012,8 +1012,16 @@ def create_bot(config: Config) -> discord.Client:
                     data = await att.read()
                 except Exception:
                     continue
-                if _detect_image_type(data):
-                    saved = _save_attachment(att.filename, data, dest_dir=_INBOUND_NOTES_DIR)
+                img_type = _detect_image_type(data)
+                if img_type:
+                    ext = {
+                        "image/jpeg": ".jpg",
+                        "image/png": ".png",
+                        "image/gif": ".gif",
+                        "image/webp": ".webp",
+                    }.get(img_type, ".jpg")
+                    ts_name = datetime.now(TZ).strftime("%Y%m%d_%H%M%S") + ext
+                    saved = _save_attachment(ts_name, data, dest_dir=_INBOUND_NOTES_DIR)
                     if saved:
                         saved_files.append(saved)
             if saved_files:
