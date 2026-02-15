@@ -1,15 +1,12 @@
 ---
 name: canvas
-description: Query and manage Newman University Canvas LMS data via CLI
-triggers:
-  - canvas
-  - assignments
-  - grades
-  - submissions
-  - course
-  - quiz
+description: Query and manage Newman University Canvas LMS data via CLI.
+  Use when user asks about "assignments", "grades", "canvas", "submissions",
+  "course", "quiz", "what's due", or discusses school work.
+allowed-tools: Bash(canvas-cli:*)
 metadata:
   clawcode:
+    emoji: "🎓"
     requires:
       bins:
         - python3
