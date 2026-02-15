@@ -19,6 +19,7 @@ config/schedules.yaml
 USER.md
 MEMORY.md
 HEARTBEAT.md
+proposals/
 
 # Data and state
 data/state.json

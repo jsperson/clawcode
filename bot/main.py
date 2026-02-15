@@ -322,6 +322,11 @@ def create_bot(config: Config) -> discord.Client:
                 shutil.copy2(hb_template, hb_path)
                 logger.info("Seeded HEARTBEAT.md from template")
 
+            # Seed proposals directory if it doesn't exist
+            proposals_dir = Path(config.paths.project_dir) / "proposals"
+            proposals_dir.mkdir(exist_ok=True)
+            (proposals_dir / "archive").mkdir(exist_ok=True)
+
             _heartbeat_task = asyncio.create_task(_heartbeat_loop())
             logger.info("In-process heartbeat started (interval=%dm)",
                         config.heartbeat.in_process.interval_minutes)
@@ -601,19 +606,50 @@ def create_bot(config: Config) -> discord.Client:
 
     def _build_heartbeat_prompt(is_full_scan: bool) -> str:
         """Build the prompt injected for a heartbeat cycle."""
+        now = datetime.now(TZ)
         scan_type = "full scan" if is_full_scan else "lightweight"
         heartbeat_path = Path(config.paths.project_dir) / "HEARTBEAT.md"
-        return (
-            f"[HEARTBEAT — {scan_type}]\n"
-            f"Read {heartbeat_path} and execute the checks for this scan tier.\n"
-            f"Scan type: {scan_type}\n"
-            f"Current time: {datetime.now(TZ).strftime('%Y-%m-%d %H:%M %Z')}\n\n"
-            "Response rules:\n"
-            "- If nothing actionable, respond with EXACTLY: [heartbeat ok]\n"
-            "- If actionable items found, respond with a concise report.\n"
-            "- Do NOT post to Discord yourself — the bot handles output routing.\n"
-            "- Keep total execution under 2-3 minutes.\n"
-        )
+
+        # Detect special review windows (full scan only)
+        review_type = None
+        time_budget = "2-3 minutes"
+
+        if is_full_scan:
+            # Monthly: first weekday of month, 14:00-16:00
+            is_month_start = now.day <= 3 and now.weekday() < 5
+            if is_month_start and 14 <= now.hour < 16:
+                review_type = "monthly"
+                time_budget = "15 minutes"
+            # Weekly: Sunday 15:00-17:00
+            elif now.weekday() == 6 and 15 <= now.hour < 17:
+                review_type = "weekly"
+                time_budget = "10 minutes"
+
+        parts = [
+            f"[HEARTBEAT — {scan_type}]",
+            f"Read {heartbeat_path} and execute the checks for this scan tier.",
+            f"Scan type: {scan_type}",
+            f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}",
+        ]
+
+        if review_type:
+            proposals_dir = Path(config.paths.project_dir) / "proposals"
+            parts.append(f"Review type: {review_type}")
+            parts.append(
+                f"This is a {review_type} review cycle. Follow the "
+                f"Self-Improvement Protocol in HEARTBEAT.md for the "
+                f"{review_type} review checklist."
+            )
+            parts.append(f"Proposals directory: {proposals_dir}")
+
+        parts.append("")
+        parts.append("Response rules:")
+        parts.append("- If nothing actionable, respond with EXACTLY: [heartbeat ok]")
+        parts.append("- If actionable items found, respond with a concise report.")
+        parts.append("- Do NOT post to Discord yourself — the bot handles output routing.")
+        parts.append(f"- Keep total execution under {time_budget}.")
+
+        return "\n".join(parts)
 
     async def _heartbeat_cli_invoke(prompt: str, channel_id_str: str) -> str | None:
         """Invoke Claude CLI for a heartbeat cycle. Returns response text."""

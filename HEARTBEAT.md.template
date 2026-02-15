@@ -78,6 +78,89 @@ You must NOT:
 - Add checks that violate guardrails
 - Remove the Self-Modification Rules section
 
+## Self-Improvement Protocol
+
+### Quality Bar
+
+- One sharp, specific observation is worth more than five vague ones
+- Only propose something if you'd bet it saves Scott time or prevents a real problem
+- If a weekly review finds nothing worth proposing, that's a good outcome — say `[heartbeat ok]`
+- Proposals are how you build trust for Phase 3 autonomy — noisy or low-value proposals erode trust
+
+### Proposal Format
+
+Write proposals to `proposals/<type>-<name>.md`:
+
+```yaml
+---
+type: skill | workflow | config | identity
+status: draft | surfaced | approved | rejected | archived
+created: YYYY-MM-DD
+surfaced: null
+decided: null
+---
+
+# Proposal: <Title>
+
+## What
+<What you're proposing — be specific>
+
+## Why
+<Pattern observed, friction point, or gap. Reference specific log entries or sessions.>
+
+## Rough Outline
+<For skills: rough SKILL.md. For config: what changes. For identity: proposed diff.>
+
+## Impact
+<What changes, what stays the same, any risks>
+```
+
+### Weekly Review (Sunday 15:00-17:00)
+
+Time budget: up to 10 minutes.
+
+1. **Pattern scan** — search past 7 daily logs using explicit CLI invocations:
+   ```
+   clawcode memory search "<topic>" --source daily --limit 10
+   ```
+   Look for:
+   - Questions asked repeatedly → MEMORY.md candidate
+   - Workflows that took multiple attempts → skill/workflow proposal candidate
+   - Information looked up repeatedly → reference doc or MEMORY.md candidate
+   - Heartbeat errors or retries → process improvement candidate
+   - Apply the quality bar: only surface patterns that are genuine, recurring, and actionable
+2. **Memory update** — append durable knowledge to MEMORY.md using the Edit tool to add entries under existing `###` sections. Follow existing section structure. Never delete entries. Only add things that will genuinely help future sessions.
+3. **Proposal generation** — write proposals for real capability gaps or friction points. Set status: `draft`. Cite specific log entries as evidence.
+4. **Proposal triage** — check `proposals/` for existing items:
+   - `draft` → surface to Discord with concise summary, update to `surfaced`
+   - `surfaced` >7 days with no decision → re-surface once, then leave alone
+   - `approved` → note implementation pending (do not implement autonomously)
+   - `rejected` >30 days → move to `proposals/archive/`
+5. **HEARTBEAT.md review** — are standing orders stale? Update if needed.
+
+### Monthly Deep Review (1st weekday of month, 14:00-16:00)
+
+Time budget: up to 15 minutes.
+
+1. **Skill audit** — read every `skills/*/SKILL.md`. Check accuracy against actual usage in past 30 days of logs. Propose retirement/merge only if clearly warranted.
+2. **Proposal cleanup** — archive stale `surfaced` (30+ days undecided), re-surface `approved` but unimplemented (30+ days), move old `rejected` to `proposals/archive/`.
+3. **Systemic friction** — review full month of logs for broader patterns weekly reviews might miss. Cross-week themes, recurring pain points.
+4. **Identity review** — read SOUL.md and STYLE.md. Propose adjustments only if there's a clear gap between how Computer operates and what these files say (type: identity).
+
+### Context Enhancement (any full scan)
+
+- If recent work produced genuinely reusable reference knowledge, write a vault note following scott-vault routing (Ideas/ for research, Projects/ for active work)
+- Add pointer in MEMORY.md for future sessions
+- High bar: only for durable knowledge, not ephemeral conversation artifacts
+
+### Self-Improvement Guardrails
+
+- **Propose, don't act** on identity files, skill definitions, or structural changes
+- **MEMORY.md appends are safe** — never delete existing entries
+- **Quality over quantity** — fewer, better proposals build trust; noise erodes it
+- **Cite evidence** — proposals without specific log references are weak proposals
+- **Time budgets:** weekly review up to 10 min, monthly review up to 15 min, regular heartbeat 2-3 min
+
 ## Standing Orders
 
 <!-- Computer: Add your standing orders below this line. -->
