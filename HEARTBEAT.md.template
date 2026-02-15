@@ -84,7 +84,7 @@ You must NOT:
 
 - One sharp, specific observation is worth more than five vague ones
 - Only propose something if you'd bet it saves Scott time or prevents a real problem
-- If a weekly review finds nothing worth proposing, that's a good outcome — say `[heartbeat ok]`
+- If a weekly review finds nothing worth proposing, that's a good outcome — but still post the review summary
 - Proposals are how you build trust for Phase 3 autonomy — noisy or low-value proposals erode trust
 
 ### Proposal Format
@@ -137,6 +137,7 @@ Time budget: up to 10 minutes.
    - `approved` → note implementation pending (do not implement autonomously)
    - `rejected` >30 days → move to `proposals/archive/`
 5. **HEARTBEAT.md review** — are standing orders stale? Update if needed.
+6. **Review summary** — always produce a summary, even if no proposals were generated. Post to Discord and write to Obsidian vault at `Projects/ClawCode-Autonomy/reviews/YYYY-MM-DD-weekly.md`. Include: patterns scanned, what was found (or not), any MEMORY.md updates made, proposals created/triaged, and standing order changes.
 
 ### Monthly Deep Review (1st weekday of month, 14:00-16:00)
 
@@ -146,6 +147,34 @@ Time budget: up to 15 minutes.
 2. **Proposal cleanup** — archive stale `surfaced` (30+ days undecided), re-surface `approved` but unimplemented (30+ days), move old `rejected` to `proposals/archive/`.
 3. **Systemic friction** — review full month of logs for broader patterns weekly reviews might miss. Cross-week themes, recurring pain points.
 4. **Identity review** — read SOUL.md and STYLE.md. Propose adjustments only if there's a clear gap between how Computer operates and what these files say (type: identity).
+5. **Review summary** — always produce a summary. Post to Discord and write to Obsidian vault at `Projects/ClawCode-Autonomy/reviews/YYYY-MM-DD-monthly.md`. Include: skills audited, proposals created/cleaned up, systemic friction found, identity observations, and overall system health assessment.
+
+### Review Summary Format
+
+Review summaries go to two places:
+
+1. **Discord** — concise version posted as the heartbeat response (not `[heartbeat ok]`)
+2. **Obsidian vault** — full version written to `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott/Projects/ClawCode-Autonomy/reviews/YYYY-MM-DD-<type>.md`
+
+Vault note format:
+```markdown
+# <Type> Review — YYYY-MM-DD
+
+## Patterns Scanned
+<What you looked for, which logs you searched>
+
+## Findings
+<What you found — or explicitly "nothing actionable this cycle">
+
+## Actions Taken
+- MEMORY.md updates: <list or "none">
+- Proposals created: <list or "none">
+- Proposals triaged: <list or "none">
+- Standing order changes: <list or "none">
+
+## System Health
+<Brief assessment — is the heartbeat working well? Are skills accurate? Any concerns?>
+```
 
 ### Context Enhancement (any full scan)
 

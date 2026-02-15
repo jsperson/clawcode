@@ -644,7 +644,17 @@ def create_bot(config: Config) -> discord.Client:
 
         parts.append("")
         parts.append("Response rules:")
-        parts.append("- If nothing actionable, respond with EXACTLY: [heartbeat ok]")
+        if review_type:
+            parts.append(
+                "- ALWAYS post a review summary to Discord (never silent "
+                "on review cycles)."
+            )
+            parts.append(
+                "- Write the full review note to the Obsidian vault as "
+                "described in the Review Summary Format section."
+            )
+        else:
+            parts.append("- If nothing actionable, respond with EXACTLY: [heartbeat ok]")
         parts.append("- If actionable items found, respond with a concise report.")
         parts.append("- Do NOT post to Discord yourself — the bot handles output routing.")
         parts.append(f"- Keep total execution under {time_budget}.")
