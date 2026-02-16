@@ -1129,14 +1129,18 @@ def _get_context(config: Config) -> str | None:
 
     Uses in-memory cache (no disk reads per message).
     Falls back to rebuilding if cache is somehow empty.
+    Appends a fresh date/time line on every call so it's never stale.
     """
     global _cached_context
-    if _cached_context:
-        return _cached_context
+    context = _cached_context
+    if not context:
+        context = _refresh_context(config)
+        if not context or not context.strip():
+            return None
 
-    # Fallback: rebuild cache if it was never initialized
-    context = _refresh_context(config)
-    return context if context.strip() else None
+    now = datetime.now(TZ)
+    date_line = f"\n\n## Current Date\n\nToday is {now.strftime('%A')}, {now.strftime('%Y-%m-%d')}. Current time: {now.strftime('%H:%M')}."
+    return context + date_line
 
 
 # ---------------------------------------------------------------------------
