@@ -142,16 +142,17 @@ Time budget: up to 10 minutes.
 
 1. **Pattern scan** — cast a wide net across multiple sources. Don't stop at daily logs.
 
-   **Daily logs** (primary source) — search past 7 daily logs:
+   **Daily summaries** (primary source) — read last 7 days of summaries:
    ```
-   clawcode memory search "<topic>" --source daily --limit 10
+   ls ~/clawcode/memory/*-summary.md | tail -7
    ```
-   Look for:
-   - Questions asked repeatedly → MEMORY.md entry or reference doc
-   - Workflows that took multiple attempts → skill or workflow proposal
-   - Information looked up repeatedly → MEMORY.md entry
-   - Errors, retries, or workarounds → process improvement proposal
-   - Things Scott said he'd do later or follow up on → standing order to track it
+   Read each summary file. Look across the week for patterns:
+   - What did Scott request repeatedly? Could it be proactive?
+   - What manual tasks appeared multiple times? Could they be automated?
+   - What workflows took multiple steps? Could they be streamlined?
+   - What existing skills/tools could handle something Scott did manually?
+
+   If summaries are missing for some days, that's OK — work with what's available.
 
    **Git history** — check what changed this week:
    ```
