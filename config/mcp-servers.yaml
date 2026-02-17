@@ -35,7 +35,7 @@ servers:
 
   qmd:
     transport: stdio
-    command: qmd
+    command: /Users/jsperson/.bun/bin/qmd
     args: ["mcp"]
     required_by: []
     setup_notes: "Local hybrid search (BM25 + vector + reranking). Install: bun install -g @tobilu/qmd"
