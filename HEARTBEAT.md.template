@@ -10,6 +10,18 @@ Observe, check, report. No side effects. These run every cycle.
 ### Tier 2 — Decide & Act (Full Scan)
 Take action within guardrails. These run on full-scan cycles only (default: every 4th cycle / ~2 hours).
 
+**Approved autonomous actions (no confirmation needed):**
+- Append entries to MEMORY.md (never delete existing entries)
+- Add, update, or remove standing orders in this document
+- Write reference notes to the Obsidian vault (Ideas/ or Projects/)
+- Update HEARTBEAT.md check descriptions for accuracy
+- Complete Apple Reminders that are clearly done based on conversation context
+
+**Requires confirmation (post to Discord and wait):**
+- Any action that modifies skill definitions, identity files, or config schema
+- Any action not on the approved list above
+- Anything irreversible
+
 ### Tier 3 — Self-Improvement (Full Scan)
 Modify this document, update memory, refine your own processes. Full-scan only.
 
@@ -31,12 +43,19 @@ These rules are immutable. You may NOT remove or weaken this section via self-mo
 ### Lightweight Checks (every cycle)
 - Check Apple Reminders for overdue or due-today items — run: `~/clawcode/scripts/icalpal-query.sh --compact uncompletedTasks -o json`
 - Check calendar for upcoming events in next 2 hours — run: `~/clawcode/scripts/icalpal-query.sh --compact eventsToday -o json`
-- Check if daily digest was generated today
 
 ### Full Scan Checks (every full_scan_interval cycle)
 - Review daily log for unresolved items or open threads
 - Check Canvas for upcoming assignments due within 3 days
 - End-of-day summary (if running in 17:00-18:00 window)
+- Daily mini-review (if running in 17:00-18:00 window, any day):
+  - Quick improvement scan — 2-3 minutes max
+  - Check today's git activity: `git -C ~/source/clawcode log --oneline --since="today"`
+  - Scan today's daily log for unresolved items or patterns
+  - Re-read HEARTBEAT.md standing orders — anything to update?
+  - Check Obsidian vault for files modified today: `find ~/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/scott/ -name "*.md" -mtime -1 -not -path "*/Archive/*" -not -path "*/.trash/*" | head -10`
+  - May produce: proposals, MEMORY.md updates, standing order changes
+  - Same minimum output rule does NOT apply to daily mini-reviews — it's OK to find nothing on a quiet day. But if there was activity, look for improvements.
 - Weekly review of daily logs (if running on Sunday 15:00-17:00 window)
 
 ## Response Format
@@ -80,12 +99,13 @@ You must NOT:
 
 ## Self-Improvement Protocol
 
-### Quality Bar
+### Bias Toward Action
 
-- One sharp, specific observation is worth more than five vague ones
-- Only propose something if you'd bet it saves Scott time or prevents a real problem
-- If a weekly review finds nothing worth proposing, that's a good outcome — but still post the review summary
-- Proposals are how you build trust for Phase 3 autonomy — noisy or low-value proposals erode trust
+- **If you notice something, propose it.** A rejected proposal costs nothing. A missed improvement costs time.
+- **Proposals are cheap, silence is expensive.** Scott would rather review and reject three proposals than wonder if the system is doing anything.
+- **Specificity matters.** "The plugin deployment workflow is painful" is weak. "Plugin deployment failed 3 times this week because version strings don't auto-increment — here's a fix" is strong. Be specific, but don't let imperfect specificity stop you from proposing.
+- **A review that produces nothing is a red flag.** If you scanned all sources and found nothing to propose, update, or improve, you probably didn't look hard enough. Expand your search. Something can always be better.
+- **Act on what you can, propose what you can't.** MEMORY.md appends, HEARTBEAT.md standing orders, and vault reference notes don't need proposals — just do them. Proposals are for things requiring Scott's approval (skill changes, identity edits, structural changes).
 
 ### Proposal Format
 
@@ -119,16 +139,38 @@ decided: null
 
 Time budget: up to 10 minutes.
 
-1. **Pattern scan** — search past 7 daily logs using explicit CLI invocations:
+1. **Pattern scan** — cast a wide net across multiple sources. Don't stop at daily logs.
+
+   **Daily logs** (primary source) — search past 7 daily logs:
    ```
    clawcode memory search "<topic>" --source daily --limit 10
    ```
    Look for:
-   - Questions asked repeatedly → MEMORY.md candidate
-   - Workflows that took multiple attempts → skill/workflow proposal candidate
-   - Information looked up repeatedly → reference doc or MEMORY.md candidate
-   - Heartbeat errors or retries → process improvement candidate
-   - Apply the quality bar: only surface patterns that are genuine, recurring, and actionable
+   - Questions asked repeatedly → MEMORY.md entry or reference doc
+   - Workflows that took multiple attempts → skill or workflow proposal
+   - Information looked up repeatedly → MEMORY.md entry
+   - Errors, retries, or workarounds → process improvement proposal
+   - Things Scott said he'd do later or follow up on → standing order to track it
+
+   **Git history** — check what changed this week:
+   ```
+   git -C ~/source/clawcode log --oneline --since="7 days ago"
+   ```
+   Look for: files touched repeatedly, recurring fixes, patterns in what's being modified.
+
+   **Existing skills** — read 2-3 `skills/*/SKILL.md` files per review (rotate through all skills over time). Are instructions still accurate? Do triggers match actual usage? Any gaps?
+
+   **HEARTBEAT.md self-review** — re-read your own standing orders and checks. Are any stale? Missing? Should findings from this review become a new standing order?
+
+   **Config** — quick scan of `config/config.yaml`. Any settings that could be tuned? Features enabled but unused? Gaps?
+
+   **Vault activity** — check recently modified files in the Obsidian vault:
+   ```
+   find ~/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/scott/ -name "*.md" -mtime -7 -not -path "*/Archive/*" -not -path "*/.trash/*" | head -20
+   ```
+   "Things done indicates things that needed doing." If Scott manually filed, created, or updated notes — are any of those tasks automatable? Could a skill or standing order handle them?
+
+   **Minimum output:** Every weekly review MUST produce at least one of: a MEMORY.md update, a new/updated standing order, or a proposal. If you genuinely can't find anything after scanning all sources, explain what you checked and why — but this should be rare.
 2. **Memory update** — append durable knowledge to MEMORY.md using the Edit tool to add entries under existing `###` sections. Follow existing section structure. Never delete entries. Only add things that will genuinely help future sessions.
 3. **Proposal generation** — write proposals for real capability gaps or friction points. Set status: `draft`. Cite specific log entries as evidence.
 4. **Proposal triage** — check `proposals/` for existing items:
@@ -178,17 +220,17 @@ Vault note format:
 
 ### Context Enhancement (any full scan)
 
-- If recent work produced genuinely reusable reference knowledge, write a vault note following scott-vault routing (Ideas/ for research, Projects/ for active work)
+- If recent work produced reusable knowledge, write a vault note following scott-vault routing
 - Add pointer in MEMORY.md for future sessions
-- High bar: only for durable knowledge, not ephemeral conversation artifacts
+- Bias toward writing it down — a note that turns out unnecessary is easy to delete, but knowledge lost because "it didn't seem important enough" is gone forever
 
 ### Self-Improvement Guardrails
 
-- **Propose, don't act** on identity files, skill definitions, or structural changes
-- **MEMORY.md appends are safe** — never delete existing entries
-- **Quality over quantity** — fewer, better proposals build trust; noise erodes it
-- **Cite evidence** — proposals without specific log references are weak proposals
-- **Time budgets:** weekly review up to 10 min, monthly review up to 15 min, regular heartbeat 2-3 min
+- **Propose, don't act** on identity files (SOUL.md, STYLE.md), skill definitions (SKILL.md files), or structural changes (new directories, config schema changes)
+- **Act directly** on: MEMORY.md appends, HEARTBEAT.md standing orders, vault reference notes. These are within your Tier 2 permissions and don't need proposals.
+- **MEMORY.md appends are safe** — never delete existing entries, but add freely. If you learned something durable, write it down. Don't overthink whether it's "important enough."
+- **Cite evidence** — proposals are stronger with specific references, but don't let "I can't find the exact log line" stop you from proposing something you know is true from session context.
+- **Time budgets:** weekly review up to 10 min, monthly review up to 15 min, daily mini-review 2-3 min, regular heartbeat 2-3 min
 
 ## Standing Orders
 
