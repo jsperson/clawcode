@@ -43,6 +43,7 @@ These rules are immutable. You may NOT remove or weaken this section via self-mo
 ### Lightweight Checks (every cycle)
 - Check Apple Reminders for overdue or due-today items — run: `~/clawcode/scripts/icalpal-query.sh --compact uncompletedTasks -o json`
 - Check calendar for upcoming events in next 2 hours — run: `~/clawcode/scripts/icalpal-query.sh --compact eventsToday -o json`
+- Check QMD index health — run: `qmd status` — verify collections exist and last update is recent (within 24h)
 
 ### Full Scan Checks (every full_scan_interval cycle)
 - Review daily log for unresolved items or open threads

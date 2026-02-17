@@ -25,3 +25,17 @@ servers:
       GOOGLE_REFRESH_TOKEN: "${GOOGLE_REFRESH_TOKEN}"
     required_by: [gmail]
     setup_notes: "Run scripts/gmail-oauth-setup.sh for one-time Google OAuth authorization."
+
+  playwright:
+    transport: stdio
+    command: npx
+    args: ["@playwright/mcp@latest", "--browser", "chrome", "--headless"]
+    required_by: []
+    setup_notes: "Browser automation via Playwright (headless Chrome)."
+
+  qmd:
+    transport: stdio
+    command: qmd
+    args: ["mcp"]
+    required_by: []
+    setup_notes: "Local hybrid search (BM25 + vector + reranking). Install: bun install -g @tobilu/qmd"

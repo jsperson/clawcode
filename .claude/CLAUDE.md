@@ -23,13 +23,18 @@ Read `USER.md` in the project root for Scott's profile, preferences, and communi
 - **MEMORY.md** — Long-term curated knowledge. Update when Scott says "remember this".
 - **memory/YYYY-MM-DD.md** — Daily session logs.
 
-### Memory Search
+### Search
 
-When you need past decisions, preferences, or historical context:
-1. Run `clawcode memory search "<query>"` before reading files directly
-2. Use `--source memory` for curated knowledge, `--source daily` for logs
-3. Use `--limit 10` if 5 results aren't enough
-4. Fall back to reading MEMORY.md directly if search returns nothing
+**Primary: QMD** (semantic + keyword search across vault, daily logs, and memory)
+- Claude has direct access to QMD tools via MCP: `qmd_search`, `qmd_query`, `qmd_get`, `qmd_status`
+- Use `qmd_search` for fast keyword lookups
+- Use `qmd_query` for important queries needing semantic understanding
+- Filter by collection: `collection: "vault"`, `collection: "daily-logs"`, `collection: "memory"`
+- Use `qmd_get` to read full file content after finding relevant results
+
+**Fallback: FTS5** (if QMD is unavailable)
+- Run `clawcode memory search "<query>"` — keyword-only, covers MEMORY.md + daily logs
+- Use `--source memory` for curated knowledge, `--source daily` for logs
 
 ## Key Paths
 

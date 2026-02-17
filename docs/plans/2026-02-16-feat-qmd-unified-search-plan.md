@@ -27,20 +27,20 @@ Install QMD, configure three collections, wire it in as an MCP server via `confi
 
 ## Acceptance Criteria
 
-- [ ] QMD installed globally (`bun install -g @tobilu/qmd`)
-- [ ] Homebrew SQLite installed (`brew install sqlite` — required for FTS5 on macOS)
-- [ ] Three collections configured:
+- [x] QMD installed globally (`bun install -g @tobilu/qmd`)
+- [x] Homebrew SQLite installed (`brew install sqlite` — required for FTS5 on macOS)
+- [x] Three collections configured:
   - `vault` → `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott` (glob: `**/*.md`)
   - `daily-logs` → `~/clawcode/memory` (glob: `*.md`)
   - `memory` → `~/clawcode` (glob: `MEMORY.md`)
-- [ ] Initial indexing complete (`qmd update && qmd embed`)
-- [ ] QMD MCP server added to `config/mcp-servers.yaml`
-- [ ] Bot generates correct `.mcp-config.json` with QMD server on restart
-- [ ] Claude can call QMD tools (qmd_search, qmd_query, qmd_get, qmd_status)
-- [ ] Scheduled re-indexing via launchd plist (daily at 03:00)
-- [ ] `.claude/CLAUDE.md` updated with QMD-first search instructions
-- [ ] FTS5 search (`clawcode memory search`) preserved as fallback
-- [ ] QMD workspace (`~/.cache/qmd/`) excluded from ClawCode backup
+- [x] Initial indexing complete (`qmd update && qmd embed`)
+- [x] QMD MCP server added to `config/mcp-servers.yaml`
+- [x] Bot generates correct `.mcp-config.json` with QMD server on restart
+- [x] Claude can call QMD tools (qmd_search, qmd_query, qmd_get, qmd_status)
+- [x] Scheduled re-indexing via launchd plist (daily at 03:00)
+- [x] `.claude/CLAUDE.md` updated with QMD-first search instructions
+- [x] FTS5 search (`clawcode memory search`) preserved as fallback
+- [x] QMD workspace (`~/.cache/qmd/`) excluded from ClawCode backup
 
 ## Technical Details
 
@@ -164,35 +164,35 @@ Replace existing memory search section with:
 ## Implementation Checklist
 
 ### Phase 1: Install & Index
-- [ ] Install Homebrew SQLite: `brew install sqlite`
-- [ ] Install QMD: `bun install -g @tobilu/qmd`
-- [ ] Verify: `qmd --version`
-- [ ] Add vault collection
-- [ ] Add daily-logs collection
-- [ ] Add memory collection
-- [ ] Run `qmd update` (full-text index)
-- [ ] Run `qmd embed` (vector embeddings, 5-10 min)
-- [ ] Verify with `qmd status`
-- [ ] Test search: `qmd search "lawn care"`, `qmd query "deployment workflow"`
+- [x] Install Homebrew SQLite: `brew install sqlite`
+- [x] Install QMD: `bun install -g @tobilu/qmd`
+- [x] Verify: `qmd --version`
+- [x] Add vault collection
+- [x] Add daily-logs collection
+- [x] Add memory collection
+- [x] Run `qmd update` (full-text index)
+- [x] Run `qmd embed` (vector embeddings, 5-10 min)
+- [x] Verify with `qmd status`
+- [x] Test search: `qmd search "lawn care"`, `qmd query "deployment workflow"`
 
 ### Phase 2: MCP Integration
-- [ ] Add QMD server to `config/mcp-servers.yaml`
+- [x] Add QMD server to `config/mcp-servers.yaml`
 - [ ] Restart bot
 - [ ] Verify `.mcp-config.json` includes QMD server
 - [ ] Check bot logs for MCP server initialization
 - [ ] Test QMD tools from a Claude session (search, query, get, status)
 
 ### Phase 3: Scheduled Re-indexing
-- [ ] Create `launchd/com.clawcode.qmd-reindex.plist`
-- [ ] Bootstrap plist: `launchctl bootstrap gui/$(id -u) launchd/com.clawcode.qmd-reindex.plist`
-- [ ] Test manually: `launchctl kickstart gui/$(id -u)/com.clawcode.qmd-reindex`
-- [ ] Verify log output in `data/logs/qmd-reindex.log`
+- [x] Create `launchd/com.clawcode.qmd-reindex.plist`
+- [x] Bootstrap plist: `launchctl bootstrap gui/$(id -u) launchd/com.clawcode.qmd-reindex.plist`
+- [x] Test manually: `launchctl kickstart gui/$(id -u)/com.clawcode.qmd-reindex`
+- [x] Verify log output in `data/logs/qmd-reindex.log`
 
 ### Phase 4: Documentation & Cleanup
-- [ ] Update `.claude/CLAUDE.md` search instructions
-- [ ] Update `HEARTBEAT.md.template` — add QMD index health check to lightweight scan
-- [ ] Add `~/.cache/qmd/` note to backup exclusions (models are re-downloadable)
-- [ ] Test FTS5 fallback still works independently
+- [x] Update `.claude/CLAUDE.md` search instructions
+- [x] Update `HEARTBEAT.md.template` — add QMD index health check to lightweight scan
+- [x] Add `~/.cache/qmd/` note to backup exclusions (models are re-downloadable)
+- [x] Test FTS5 fallback still works independently
 
 ## Dependencies & Risks
 
