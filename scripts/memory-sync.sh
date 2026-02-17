@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-# memory-sync.sh — Git add + commit memory files (called by launchd hourly)
+# memory-sync.sh — Git add + commit curated memory files (called by launchd hourly)
+# NOTE: Daily logs (memory/*.md) are NOT committed — they stay on disk only,
+# indexed by QMD for search. Only curated files go into git.
 set -euo pipefail
 
 CLAWCODE_DIR="$HOME/clawcode"
 cd "$CLAWCODE_DIR"
 
-# Only proceed if there are changes to memory files
-if git diff --quiet MEMORY.md USER.md memory/ 2>/dev/null && \
-   git diff --cached --quiet MEMORY.md USER.md memory/ 2>/dev/null && \
-   [ -z "$(git ls-files --others --exclude-standard MEMORY.md USER.md memory/)" ]; then
+# Only check curated files (not daily logs in memory/)
+if git diff --quiet MEMORY.md USER.md IDENTITY.md 2>/dev/null && \
+   git diff --cached --quiet MEMORY.md USER.MD IDENTITY.md 2>/dev/null; then
     exit 0
 fi
 
-# Stage memory files
-git add MEMORY.md USER.md IDENTITY.md memory/ 2>/dev/null || true
+# Stage curated files only
+git add MEMORY.md USER.md IDENTITY.md 2>/dev/null || true
 
 # Commit if there are staged changes
 if ! git diff --cached --quiet 2>/dev/null; then
