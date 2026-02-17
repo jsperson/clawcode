@@ -21,6 +21,11 @@ MEMORY.md
 HEARTBEAT.md
 proposals/
 
+# Playwright / MCP
+.playwright-mcp/
+.mcp.json
+data/playwright-profile/
+
 # Data and state
 data/state.json
 data/logs/
@@ -31,6 +36,8 @@ data/gateway.db
 data/gateway.db-wal
 data/gateway.db-shm
 data/gateway.sock
+data/gateway-sessions.json
+data/plan.md
 data/.mcp-config.json
 
 # Compiled binaries
