@@ -3,7 +3,7 @@ name: apple-reminders
 description: Manage Apple Reminders — create, list, complete, and query tasks.
   Use when user asks to "remind me", "add a reminder", "what are my tasks",
   "show reminders", "complete task", or discusses to-do items.
-allowed-tools: Bash(remindctl:*)
+allowed-tools: Bash(remindctl-query:*)
 metadata:
   clawcode:
     emoji: "⏰"
@@ -15,6 +15,8 @@ metadata:
 # Apple Reminders CLI (remindctl)
 
 Use `remindctl` to manage Apple Reminders directly from the terminal.
+
+**Important:** Always use `remindctl-query.sh` (not `remindctl` directly) when running from Claude Code or SSH sessions. The wrapper bypasses macOS TCC restrictions via a launchd one-shot job.
 
 ## Scott's Reminder Lists
 
@@ -33,61 +35,63 @@ Default to "Home" when no list is specified.
 
 ```bash
 # Today's reminders
-remindctl today
+remindctl-query.sh today
 
 # Tomorrow
-remindctl tomorrow
+remindctl-query.sh tomorrow
 
 # This week
-remindctl week
+remindctl-query.sh week
 
 # Overdue items
-remindctl overdue
+remindctl-query.sh overdue
 
 # Upcoming
-remindctl upcoming
+remindctl-query.sh upcoming
 
 # All reminders
-remindctl all
+remindctl-query.sh all
 
 # Specific list
-remindctl list Home
+remindctl-query.sh list Home
 ```
 
 ### Create Reminders
 
 ```bash
 # Quick add (defaults to Home list)
-remindctl add "Buy milk"
+remindctl-query.sh add "Buy milk"
 
 # With list and due date
-remindctl add --title "Call dentist" --list Home --due tomorrow
+remindctl-query.sh add --title "Call dentist" --list Home --due tomorrow
 
 # With specific date
-remindctl add --title "Submit assignment" --list School --due 2026-02-15
+remindctl-query.sh add --title "Submit assignment" --list School --due 2026-02-15
 ```
 
 ### Complete Reminders
 
 ```bash
-# Complete by ID (get IDs from list commands)
-remindctl complete 1 2 3
+# Complete by UUID (always use UUIDs, not display numbers)
+remindctl-query.sh complete 61A091EE-3FA8-4FEC-90C6-F6A4D1C6C23D
 ```
+
+**Warning:** Display numbers like `[1]` in text output are global indexes across ALL reminders, not scoped to the current view. Always fetch `--json` first, extract the `id` field (UUID), and pass that to `complete`. Never use display numbers from filtered views like `upcoming` or `today`.
 
 ### Delete Reminders
 
 ```bash
-remindctl delete 4A83 --force
+remindctl-query.sh delete 4A83 --force
 ```
 
 ### Output Formats
 
 ```bash
 # JSON for parsing
-remindctl today --json
+remindctl-query.sh today --json
 
 # Plain TSV
-remindctl today --plain
+remindctl-query.sh today --plain
 ```
 
 ## Date Formats
@@ -108,4 +112,4 @@ For calendar event queries and creation, use `clawcal` (see the calendar skill).
 - Use `jq` for filtering and formatting JSON results
 - When creating reminders, pick the most appropriate list from Scott's lists above
 - Default to "Home" list for general personal reminders
-- For morning briefings, combine `remindctl today` + `remindctl overdue` + `clawcal events`
+- For morning briefings, combine `remindctl-query.sh today` + `remindctl-query.sh overdue` + `clawcal events`

@@ -26,8 +26,10 @@ OVERDUE_COUNT=0
 TODAY_COUNT=0
 
 if command -v remindctl &> /dev/null; then
+  REMINDCTL="$SCRIPT_DIR/remindctl-query.sh"
+
   # Get overdue tasks
-  overdue_json=$(remindctl overdue --json 2>/dev/null || echo "[]")
+  overdue_json=$("$REMINDCTL" overdue --json 2>/dev/null || echo "[]")
   OVERDUE_COUNT=$(echo "$overdue_json" | jq 'length' 2>/dev/null || echo "0")
 
   if [ "$OVERDUE_COUNT" -gt 0 ]; then
@@ -41,7 +43,7 @@ $task"
   fi
 
   # Get today's tasks
-  today_json=$(remindctl today --json 2>/dev/null || echo "[]")
+  today_json=$("$REMINDCTL" today --json 2>/dev/null || echo "[]")
   TODAY_COUNT=$(echo "$today_json" | jq 'length' 2>/dev/null || echo "0")
 
   if [ "$TODAY_COUNT" -gt 0 ]; then
@@ -58,7 +60,7 @@ $task"
   TASK_LIST="$TASK_LIST
 ### All Active Tasks"
   for list in "Home" "Consulting" "School" "Family" "Shopping" "Side Projects"; do
-    list_json=$(remindctl list "$list" --json 2>/dev/null || echo "[]")
+    list_json=$("$REMINDCTL" list "$list" --json 2>/dev/null || echo "[]")
     list_count=$(echo "$list_json" | jq '[.[] | select(.isCompleted == false)] | length' 2>/dev/null || echo "0")
 
     if [ "$list_count" -gt 0 ]; then
@@ -72,7 +74,7 @@ $task"
   done
 
   # Get total count
-  TASK_COUNT=$(remindctl all --json 2>/dev/null | jq '[.[] | select(.isCompleted == false)] | length' 2>/dev/null || echo "0")
+  TASK_COUNT=$("$REMINDCTL" all --json 2>/dev/null | jq '[.[] | select(.isCompleted == false)] | length' 2>/dev/null || echo "0")
 else
   TASK_LIST="
 - remindctl not installed"
