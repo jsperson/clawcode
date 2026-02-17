@@ -104,6 +104,13 @@ class SessionDetach:
     claude_session_id: str = ""  # Updated ID from interactive claude run
 
 
+@dataclass
+class PoolReset:
+    """Client requests all claude processes be killed and sessions cleared."""
+
+    type: str = field(default="pool.reset", init=False)
+
+
 # ---------------------------------------------------------------------------
 # Gateway → Client messages
 # ---------------------------------------------------------------------------
@@ -208,6 +215,14 @@ class SessionDetachOk:
 
 
 @dataclass
+class PoolResetOk:
+    """All claude processes killed and sessions cleared."""
+
+    type: str = field(default="pool.reset.ok", init=False)
+    killed: int = 0
+
+
+@dataclass
 class LifecycleEvent:
     """Gateway lifecycle event."""
 
@@ -244,12 +259,13 @@ _REQUEST_TYPES: dict[str, type] = {
     "session.list": SessionList,
     "session.attach": SessionAttach,
     "session.detach": SessionDetach,
+    "pool.reset": PoolReset,
 }
 
 
 def parse_request(
     data: dict[str, Any],
-) -> AuthRequest | SessionCreate | SessionResume | UserMessage | CancelRequest | SessionList | SessionAttach | SessionDetach:
+) -> AuthRequest | SessionCreate | SessionResume | UserMessage | CancelRequest | SessionList | SessionAttach | SessionDetach | PoolReset:
     """Parse a JSON dict into a typed request object.
 
     Raises:

@@ -144,6 +144,20 @@ class GatewayClient:
                      "messages will fall back to direct CLI", max_attempts)
         return False
 
+    async def reset_pool(self) -> None:
+        """Tell the gateway to kill all claude processes and clear sessions."""
+        if not self._ws or not self._connected:
+            return
+        try:
+            await self._ws.send(json.dumps({"type": "pool.reset"}))
+            # Wait for ack (best effort, don't block shutdown on it)
+            resp = await asyncio.wait_for(self._ws.recv(), timeout=10)
+            data = json.loads(resp)
+            killed = data.get("killed", "?")
+            logger.info("Gateway pool reset — killed %s processes", killed)
+        except Exception:
+            logger.warning("Gateway pool reset failed (non-fatal)")
+
     async def disconnect(self) -> None:
         """Disconnect from the gateway."""
         self._connected = False

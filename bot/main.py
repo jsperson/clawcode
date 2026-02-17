@@ -399,8 +399,12 @@ def create_bot(config: Config) -> discord.Client:
         except Exception:
             logger.exception("Error sending shutdown message")
 
-        # 1. Disconnect gateway client
+        # 1. Reset gateway pool (kill orphan claude processes) then disconnect
         if gw_client and gw_client.connected:
+            try:
+                await gw_client.reset_pool()
+            except Exception:
+                logger.exception("Error resetting gateway pool")
             try:
                 await gw_client.disconnect()
             except Exception:
@@ -669,6 +673,10 @@ def create_bot(config: Config) -> discord.Client:
             elif now.weekday() == 6 and 15 <= now.hour < 17:
                 review_type = "weekly"
                 time_budget = "10 minutes"
+            # Daily mini-review: 17:00-18:00 any day
+            elif 17 <= now.hour < 18:
+                review_type = "daily-mini"
+                time_budget = "2-3 minutes"
 
         parts = [
             f"[HEARTBEAT — {scan_type}]",
@@ -680,16 +688,24 @@ def create_bot(config: Config) -> discord.Client:
         if review_type:
             proposals_dir = Path(config.paths.project_dir) / "proposals"
             parts.append(f"Review type: {review_type}")
-            parts.append(
-                f"This is a {review_type} review cycle. Follow the "
-                f"Self-Improvement Protocol in HEARTBEAT.md for the "
-                f"{review_type} review checklist."
-            )
+            if review_type == "daily-mini":
+                parts.append(
+                    "This is a daily mini-review. Run the daily mini-review checks "
+                    "from HEARTBEAT.md. Quick scan only — 2-3 minutes max. "
+                    "OK to find nothing on a quiet day, but if there was activity today, "
+                    "look for improvements."
+                )
+            else:
+                parts.append(
+                    f"This is a {review_type} review cycle. Follow the "
+                    f"Self-Improvement Protocol in HEARTBEAT.md for the "
+                    f"{review_type} review checklist."
+                )
             parts.append(f"Proposals directory: {proposals_dir}")
 
         parts.append("")
         parts.append("Response rules:")
-        if review_type:
+        if review_type and review_type != "daily-mini":
             parts.append(
                 "- ALWAYS post a review summary to Discord (never silent "
                 "on review cycles)."
@@ -698,7 +714,7 @@ def create_bot(config: Config) -> discord.Client:
                 "- Write the full review note to the Obsidian vault as "
                 "described in the Review Summary Format section."
             )
-        else:
+        elif not review_type:
             parts.append("- If nothing actionable, respond with EXACTLY: [heartbeat ok]")
         parts.append("- If actionable items found, respond with a concise report.")
         parts.append("- Do NOT post to Discord yourself — the bot handles output routing.")
@@ -1041,6 +1057,22 @@ def create_bot(config: Config) -> discord.Client:
         channel_id = message.channel.id
 
         # --- Synchronous commands (not queued) ---
+
+        if user_text == "!reboot":
+            logger.info("Full reboot requested by %s — clearing sessions and caches", message.author)
+            await message.channel.send("Rebooting. Full clean restart — all sessions and caches cleared.")
+            # Wipe in-memory sessions so save on shutdown writes empty files
+            bridge._sessions.clear()
+            if gw_client:
+                gw_client._sessions.clear()
+            # Delete cache/config files that should regenerate on startup
+            for fname in ("context.cache", ".mcp-config.json"):
+                p = Path(config.paths.data_dir) / fname
+                if p.exists():
+                    p.unlink()
+                    logger.info("Removed %s", p)
+            await _shutdown()
+            return
 
         if user_text == "!restart":
             logger.info("Restart requested by %s", message.author)

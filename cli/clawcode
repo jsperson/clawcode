@@ -75,9 +75,9 @@ if [ $# -eq 0 ]; then
     # Interactive session
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
+        exec "$CLAUDE" --dangerously-skip-permissions --chrome --add-dir "$VAULT" --append-system-prompt "$CONTEXT"
     else
-        exec "$CLAUDE" --dangerously-skip-permissions --add-dir "$VAULT"
+        exec "$CLAUDE" --dangerously-skip-permissions --chrome --add-dir "$VAULT"
     fi
 
 elif [ "$1" = "doctor" ]; then
@@ -276,9 +276,9 @@ elif [ "$1" = "--continue" ]; then
     shift
     CONTEXT=$(cat "$CONTEXT_CACHE" 2>/dev/null || true)
     if [ -n "$CONTEXT" ]; then
-        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
+        exec "$CLAUDE" --continue --dangerously-skip-permissions --chrome --add-dir "$VAULT" --append-system-prompt "$CONTEXT" "$@"
     else
-        exec "$CLAUDE" --continue --dangerously-skip-permissions --add-dir "$VAULT" "$@"
+        exec "$CLAUDE" --continue --dangerously-skip-permissions --chrome --add-dir "$VAULT" "$@"
     fi
 
 else

@@ -21,6 +21,8 @@ from .protocol import (
     CancelRequest,
     ClientType,
     ErrorEvent,
+    PoolReset,
+    PoolResetOk,
     ResponseChunk,
     ResponseComplete,
     SessionAttach,
@@ -130,6 +132,8 @@ class Router:
             await self._handle_session_attach(client, request)
         elif isinstance(request, SessionDetach):
             await self._handle_session_detach(client, request)
+        elif isinstance(request, PoolReset):
+            await self._handle_pool_reset(client)
 
     async def broadcast(self, msg: Any, exclude: str | None = None) -> None:
         """Send a message to all authenticated clients."""
@@ -307,6 +311,18 @@ class Router:
             claude_session_id=req.claude_session_id or None,
         )
         await client.send(SessionDetachOk(session_id=session.id))
+
+    # -----------------------------------------------------------------------
+    # Pool management
+    # -----------------------------------------------------------------------
+
+    async def _handle_pool_reset(self, client: Client) -> None:
+        """Kill all claude processes and clear all sessions."""
+        count = self._pool.active_count
+        await self._pool.kill_all()
+        self._sessions.clear_all()
+        logger.info("Pool reset by client %s — killed %d processes", client.client_id[:8], count)
+        await client.send(PoolResetOk(killed=count))
 
     # -----------------------------------------------------------------------
     # Claude routing

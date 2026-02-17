@@ -239,6 +239,20 @@ class SessionManager:
             logger.info("Marked %d active sessions as idle (shutdown)", count)
         return count
 
+    def clear_all(self) -> int:
+        """Expire all active and idle sessions. Used during pool reset.
+
+        Returns the number of sessions expired.
+        """
+        cursor = self._conn.execute(
+            "UPDATE sessions SET status = ? WHERE status IN (?, ?)",
+            (SessionStatus.EXPIRED.value, SessionStatus.ACTIVE.value, SessionStatus.IDLE.value),
+        )
+        count = cursor.rowcount
+        if count:
+            logger.info("Expired %d sessions (pool reset)", count)
+        return count
+
     # -----------------------------------------------------------------------
     # Message history
     # -----------------------------------------------------------------------
