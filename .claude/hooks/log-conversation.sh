@@ -31,12 +31,7 @@ fi
 if [ "$EVENT" = "UserPromptSubmit" ]; then
     PROMPT=$(echo "$INPUT" | /usr/bin/jq -r '.prompt // empty')
     if [ -n "$PROMPT" ]; then
-        ENTRY=$(printf '\n### %s\n\n**scott_person:** %s\n' "$NOW" "$PROMPT")
-        # Append with flock for safe concurrent writes
-        (
-            flock 200
-            printf '%s\n' "$ENTRY" >> "$LOG_FILE"
-        ) 200>"$LOG_FILE.lock"
+        printf '\n### %s\n\n**scott_person:** %s\n\n' "$NOW" "$PROMPT" >> "$LOG_FILE"
     fi
 
 elif [ "$EVENT" = "Stop" ]; then
@@ -55,11 +50,7 @@ elif [ "$EVENT" = "Stop" ]; then
                 TRUNCATED="$RESPONSE"
                 SUFFIX=""
             fi
-            # Append with flock for safe concurrent writes
-            (
-                flock 200
-                printf '**Computer:** %s%s\n\n' "$TRUNCATED" "$SUFFIX" >> "$LOG_FILE"
-            ) 200>"$LOG_FILE.lock"
+            printf '**Computer:** %s%s\n\n' "$TRUNCATED" "$SUFFIX" >> "$LOG_FILE"
         fi
     fi
 fi
