@@ -32,9 +32,10 @@ elif [ "$EVENT" = "Stop" ]; then
     TRANSCRIPT=$(echo "$INPUT" | /usr/bin/jq -r '.transcript_path // empty')
     if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
         # Get the last assistant message from the transcript
+        # Transcript uses .type == "assistant" (not .role) with content at .message.content[]
         RESPONSE=$(tail -50 "$TRANSCRIPT" | \
-            /usr/bin/jq -s 'map(select(.role == "assistant")) | last | .content | map(select(.type == "text")) | map(.text) | join("\n")' -r 2>/dev/null || true)
-        if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "null" ]; then
+            /usr/bin/jq -s 'map(select(.type == "assistant")) | last | .message.content | map(select(.type == "text")) | map(.text) | join("\n")' -r 2>/dev/null || true)
+        if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "null" ] && [ -n "$RESPONSE" ]; then
             # Truncate very long responses to keep logs manageable
             TRUNCATED=$(echo "$RESPONSE" | head -50)
             LINECOUNT=$(echo "$RESPONSE" | wc -l | tr -d ' ')
