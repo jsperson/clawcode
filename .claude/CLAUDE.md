@@ -21,7 +21,8 @@ Read `USER.md` in the project root for Scott's profile, preferences, and communi
 ## Memory
 
 - **MEMORY.md** — Long-term curated knowledge. Update when Scott says "remember this".
-- **memory/YYYY-MM-DD.md** — Daily session logs.
+- **memory/YYYY-MM-DD-discord.md** — Discord session logs.
+- **memory/YYYY-MM-DD-cli.md** — CLI session logs.
 
 ### Search
 
@@ -57,4 +58,4 @@ Skills are loaded from `~/clawcode/skills/*/SKILL.md`. Each skill has YAML front
 
 ## Daily Log
 
-Discord conversations are automatically logged to `memory/YYYY-MM-DD.md` in real-time by the bot. You do NOT need to write end-of-session summaries — the raw exchanges are the record. Memory search indexes these logs for retrieval.
+Discord conversations are logged to `memory/YYYY-MM-DD-discord.md` and CLI conversations to `memory/YYYY-MM-DD-cli.md`. You do NOT need to write end-of-session summaries — the raw exchanges are the record. Memory search indexes both log types for retrieval.

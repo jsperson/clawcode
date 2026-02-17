@@ -25,7 +25,7 @@ def _memory_path(config: Config) -> Path:
 
 def _daily_log_path(config: Config, d: date | None = None) -> Path:
     d = d or _today()
-    return Path(config.paths.memory_dir) / f"{d.isoformat()}.md"
+    return Path(config.paths.memory_dir) / f"{d.isoformat()}-discord.md"
 
 
 def _template_path(config: Config) -> Path:
