@@ -178,7 +178,8 @@ Time budget: up to 10 minutes.
 4. **Proposal triage** — check `proposals/` for existing items:
    - `draft` → surface to Discord with concise summary, update to `surfaced`
    - `surfaced` >7 days with no decision → re-surface once, then leave alone
-   - `approved` → note implementation pending (do not implement autonomously)
+   - `approved` with `type: skill` → create `skills/<name>/SKILL.md` from the proposal's Rough Outline, then update status to `implemented` and run `!reload` to pick it up
+   - `approved` with other types → note implementation pending (do not implement autonomously without explicit instructions)
    - `rejected` >30 days → move to `proposals/archive/`
 5. **HEARTBEAT.md review** — are standing orders stale? Update if needed.
 6. **Review summary** — always produce a summary, even if no proposals were generated. Post to Discord and write to Obsidian vault at `Projects/ClawCode-Autonomy/reviews/YYYY-MM-DD-weekly.md`. Include: patterns scanned, what was found (or not), any MEMORY.md updates made, proposals created/triaged, and standing order changes.
@@ -228,7 +229,8 @@ Vault note format:
 
 ### Self-Improvement Guardrails
 
-- **Propose, don't act** on identity files (SOUL.md, STYLE.md), skill definitions (SKILL.md files), or structural changes (new directories, config schema changes)
+- **Propose, don't act** on identity files (SOUL.md, STYLE.md), config schema changes, or structural changes (new directories, new config keys)
+- **Skills: propose first, implement on approval.** New skills require a proposal. Once Scott approves in Discord, create `skills/<name>/SKILL.md` from the proposal outline and run `!reload`.
 - **Act directly** on: MEMORY.md appends, HEARTBEAT.md standing orders, vault reference notes. These are within your Tier 2 permissions and don't need proposals.
 - **MEMORY.md appends are safe** — never delete existing entries, but add freely. If you learned something durable, write it down. Don't overthink whether it's "important enough."
 - **Cite evidence** — proposals are stronger with specific references, but don't let "I can't find the exact log line" stop you from proposing something you know is true from session context.

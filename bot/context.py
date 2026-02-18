@@ -94,6 +94,18 @@ def build_context(config: Config) -> str:
         "Fall back to reading MEMORY.md directly if search returns nothing."
     )
 
+    # Initiative queue summary for conversation context
+    queue_items = _read_queue_items(config, limit=3)
+    if queue_items:
+        lines = [
+            "## Initiative Queue (Top Items)\n",
+            "These are items Computer is actively tracking. "
+            "Mention relevant items in conversation when they connect "
+            "to what Scott is discussing.\n",
+        ]
+        lines.extend(queue_items)
+        parts.append("\n".join(lines))
+
     context = "\n\n".join(parts)
     logger.info("Built context: %d chars", len(context))
     return context
@@ -133,3 +145,25 @@ def _read_file(path: Path) -> str:
         return path.read_text(encoding="utf-8").strip()
     except (FileNotFoundError, PermissionError):
         return ""
+
+
+def _read_queue_items(config: Config, limit: int = 3) -> list[str]:
+    """Read top N active items from the initiative queue in the Obsidian vault."""
+    vault_path = Path(config.vault.path)
+    queue_path = vault_path / "Projects/ClawCode-Autonomy/initiative-queue.md"
+    content = _read_file(queue_path)
+    if not content:
+        return []
+    in_active = False
+    items: list[str] = []
+    for line in content.splitlines():
+        if line.strip().startswith("## Active"):
+            in_active = True
+            continue
+        if in_active and line.strip().startswith("## "):
+            break
+        if in_active and line.strip().startswith("- [ ]"):
+            items.append(line.strip())
+            if len(items) >= limit:
+                break
+    return items

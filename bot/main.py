@@ -157,10 +157,11 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 MAX_ATTACHMENTS = 5
 ATTACHMENT_DIR = Path("/tmp/clawcode-attachments")
 
-_INBOUND_NOTES_DIR = Path.home() / (
+OBSIDIAN_VAULT = Path.home() / (
     "Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
-    "/Personal Notes/Inbound Notes"
 )
+
+_INBOUND_NOTES_DIR = OBSIDIAN_VAULT / "Personal Notes/Inbound Notes"
 
 
 def _is_notes_request(text: str) -> bool:
@@ -270,10 +271,7 @@ def _save_attachment(
 # ---------------------------------------------------------------------------
 
 
-_VAULT_REVIEWS_DIR = Path.home() / (
-    "Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
-    "/Projects/ClawCode-Autonomy/reviews"
-)
+_VAULT_REVIEWS_DIR = OBSIDIAN_VAULT / "Projects/ClawCode-Autonomy/reviews"
 
 
 def _log_heartbeat_to_vault(response: str, is_silent: bool) -> None:
@@ -650,6 +648,77 @@ def create_bot(config: Config) -> discord.Client:
             return None
 
     # -------------------------------------------------------------------
+    # Heartbeat state & initiative queue helpers
+    # -------------------------------------------------------------------
+
+    _INITIATIVE_QUEUE_PATH = OBSIDIAN_VAULT / "Projects/ClawCode-Autonomy/initiative-queue.md"
+    _HEARTBEAT_STATE_PATH = Path(config.paths.data_dir) / "heartbeat-state.json"
+
+    def _read_initiative_queue(limit: int = 5) -> list[str]:
+        """Read top N active items from the initiative queue."""
+        try:
+            content = _INITIATIVE_QUEUE_PATH.read_text(encoding="utf-8")
+        except (FileNotFoundError, PermissionError):
+            return []
+        # Extract lines between "## Active" and the next "##" heading
+        in_active = False
+        items: list[str] = []
+        for line in content.splitlines():
+            if line.strip().startswith("## Active"):
+                in_active = True
+                continue
+            if in_active and line.strip().startswith("## "):
+                break
+            if in_active and line.strip().startswith("- [ ]"):
+                items.append(line.strip())
+                if len(items) >= limit:
+                    break
+        return items
+
+    def _read_heartbeat_state() -> dict:
+        """Read heartbeat state, return empty defaults if missing."""
+        defaults = {
+            "cycles": [],
+            "consecutive_silent_full_scans": 0,
+            "last_action_timestamp": None,
+            "last_proposal_timestamp": None,
+        }
+        try:
+            data = json.loads(_HEARTBEAT_STATE_PATH.read_text(encoding="utf-8"))
+            # Merge with defaults for any missing keys
+            for k, v in defaults.items():
+                data.setdefault(k, v)
+            return data
+        except (FileNotFoundError, json.JSONDecodeError, PermissionError):
+            return defaults
+
+    def _write_heartbeat_state(state: dict) -> None:
+        """Write updated heartbeat state after cycle completes."""
+        try:
+            _HEARTBEAT_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            # Cap cycles at 20 entries
+            if len(state.get("cycles", [])) > 20:
+                state["cycles"] = state["cycles"][-20:]
+            _HEARTBEAT_STATE_PATH.write_text(
+                json.dumps(state, indent=2) + "\n", encoding="utf-8"
+            )
+        except OSError:
+            logger.debug("Failed to write heartbeat state", exc_info=True)
+
+    def _classify_heartbeat_outcome(response: str, is_silent: bool) -> str:
+        """Classify heartbeat response as silent/observation/action/proposal."""
+        if is_silent:
+            return "silent"
+        lower = response.lower()
+        if "proposals/" in lower or "wrote a proposal" in lower:
+            return "proposal"
+        # Heuristic: action if response mentions file writes
+        action_signals = ["wrote", "created", "updated", "added to", "appended"]
+        if any(sig in lower for sig in action_signals):
+            return "action"
+        return "observation"
+
+    # -------------------------------------------------------------------
     # In-process heartbeat
     # -------------------------------------------------------------------
 
@@ -685,16 +754,73 @@ def create_bot(config: Config) -> discord.Client:
             f"Current time: {now.strftime('%Y-%m-%d %H:%M %Z')}",
         ]
 
+        # --- Embed heartbeat state (cross-cycle memory) ---
+        state = _read_heartbeat_state()
+        recent_cycles = state.get("cycles", [])[-3:]
+        if recent_cycles:
+            parts.append("")
+            parts.append("Recent heartbeat cycles:")
+            for c in recent_cycles:
+                ts = c.get("timestamp", "?")[:16]  # trim to minute
+                parts.append(f"  {ts} | {c.get('scan_type', '?')} | {c.get('outcome', '?')}")
+
+        silent_count = state.get("consecutive_silent_full_scans", 0)
+        if silent_count >= 5:
+            parts.append(
+                f"WARNING: {silent_count} consecutive silent full-scans. "
+                "Checks may be too passive. Look harder — scan more sources, "
+                "check the initiative queue, try to find something worth acting on."
+            )
+
+        # --- Embed initiative queue items ---
+        queue_items = _read_initiative_queue(limit=5)
+        if queue_items:
+            parts.append("")
+            parts.append("Initiative queue (top items):")
+            for item in queue_items:
+                parts.append(f"  {item}")
+            if is_full_scan:
+                parts.append(
+                    "ACTION: Pick the highest-priority unchecked queue item and "
+                    "take action on it (within Tier 2 permissions). If it needs "
+                    "Scott's approval, write a proposal to proposals/."
+                )
+
+        # --- Queue population instruction (all cycles) ---
+        parts.append("")
+        parts.append(
+            f"Initiative queue file: {_INITIATIVE_QUEUE_PATH}"
+        )
+        parts.append(
+            "When you observe something worth following up on — a pattern, "
+            "a scheduling conflict, a recurring task, an improvement opportunity "
+            "— add it to the initiative queue with format: "
+            '- [ ] **[priority]** description (source, YYYY-MM-DD)'
+        )
+
         if review_type:
             proposals_dir = Path(config.paths.project_dir) / "proposals"
+            parts.append("")
             parts.append(f"Review type: {review_type}")
             if review_type == "daily-mini":
                 parts.append(
-                    "This is a daily mini-review. Run the daily mini-review checks "
-                    "from HEARTBEAT.md. Quick scan only — 2-3 minutes max. "
-                    "OK to find nothing on a quiet day, but if there was activity today, "
-                    "look for improvements."
+                    "This is a daily mini-review. You MUST produce at least one "
+                    "observation, even if it's 'Nothing notable today because "
+                    "[specific reason].' Silence is not acceptable for review cycles."
                 )
+            elif review_type == "weekly":
+                parts.append(
+                    f"This is a weekly review cycle. Follow the "
+                    f"Self-Improvement Protocol in HEARTBEAT.md for the "
+                    f"weekly review checklist."
+                )
+                # Weekly accountability
+                last_proposal = state.get("last_proposal_timestamp")
+                if not last_proposal:
+                    parts.append(
+                        "NOTE: No proposals have ever been written. "
+                        "This weekly review MUST attempt at least one proposal draft."
+                    )
             else:
                 parts.append(
                     f"This is a {review_type} review cycle. Follow the "
@@ -857,12 +983,52 @@ def create_bot(config: Config) -> discord.Client:
                 # Heartbeat path — no status messages, no streaming
                 response = await _heartbeat_cli_invoke(user_text, channel_id_str)
 
+                # Determine scan type from prompt text for state tracking
+                hb_is_full = "full scan" in user_text[:50]
+                hb_review = None
+                if "Review type: weekly" in user_text:
+                    hb_review = "weekly"
+                elif "Review type: daily-mini" in user_text:
+                    hb_review = "daily-mini"
+                elif "Review type: monthly" in user_text:
+                    hb_review = "monthly"
+
                 if response:
                     stripped = response.strip()
                     is_silent = "[heartbeat ok]" in stripped.lower()
 
                     # Log ALL heartbeat output to Obsidian vault
                     _log_heartbeat_to_vault(response, is_silent)
+
+                    # Track cycle outcome in heartbeat state
+                    outcome = _classify_heartbeat_outcome(response, is_silent)
+                    state = _read_heartbeat_state()
+                    cycle_entry = {
+                        "timestamp": datetime.now(TZ).isoformat(),
+                        "scan_type": "full" if hb_is_full else "lightweight",
+                        "outcome": outcome,
+                        "review_type": hb_review,
+                    }
+                    state["cycles"].append(cycle_entry)
+                    # Update consecutive silent counter (full-scans only)
+                    if hb_is_full:
+                        if outcome == "silent":
+                            state["consecutive_silent_full_scans"] = (
+                                state.get("consecutive_silent_full_scans", 0) + 1
+                            )
+                        else:
+                            state["consecutive_silent_full_scans"] = 0
+                    # Update action/proposal timestamps
+                    if outcome == "action":
+                        state["last_action_timestamp"] = cycle_entry["timestamp"]
+                    elif outcome == "proposal":
+                        state["last_proposal_timestamp"] = cycle_entry["timestamp"]
+                        state["last_action_timestamp"] = cycle_entry["timestamp"]
+                    _write_heartbeat_state(state)
+                    logger.info(
+                        "Heartbeat state: outcome=%s, silent_streak=%d",
+                        outcome, state.get("consecutive_silent_full_scans", 0),
+                    )
 
                     if is_silent:
                         logger.info("Heartbeat: ok (silent)")
