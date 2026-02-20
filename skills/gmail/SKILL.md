@@ -84,12 +84,28 @@ gmail_attachment_get      — Download an attachment by message and attachment I
 ~/clawcode/scripts/gmail-send-attachment.sh <to> <subject> <body> <file>
 ```
 
-Supports HTML, PDF, DOCX, EPUB, MOBI, TXT. Uses the same OAuth credentials as gmail-mcp.
+Supports HTML, PDF, DOCX, EPUB, TXT. Uses the same OAuth credentials as gmail-mcp.
 
-**Kindle:** To send documents to Scott's Kindle:
-```bash
-~/clawcode/scripts/gmail-send-attachment.sh jsperson_PuR3Fa@kindle.com "Title" "See attached." /path/to/file.html
-```
+**Kindle — Send to Kindle workflow:**
+
+Kindle's email service is picky. Use EPUB format with proper metadata:
+
+1. Save content as HTML (with `<html lang="en">` and proper structure)
+2. Convert to EPUB via calibre with language tag and no page-break splitting:
+   ```bash
+   ebook-convert input.html output.epub --language en --title "Title" --authors "Author" --chapter "/" --page-breaks-before "/"
+   ```
+3. Send:
+   ```bash
+   ~/clawcode/scripts/gmail-send-attachment.sh jsperson_PuR3Fa@kindle.com "Title" "See attached." output.epub
+   ```
+
+**Important Kindle gotchas:**
+- **Always set `--language en`** — missing language metadata causes E999 rejection
+- **Use `--chapter "/" --page-breaks-before "/"`** — prevents splitting at every `<h2>`, avoids short pages with excess whitespace
+- **MOBI is dead** — Amazon no longer accepts MOBI (E001 unsupported format)
+- **HTML renders poorly** on Kindle — always convert to EPUB first
+- **PDF works** but has no text reflow (bad on small screens)
 
 ### Filters & Settings
 
