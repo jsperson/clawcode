@@ -22,6 +22,25 @@ if [ ! -f "$FILE" ]; then
     exit 1
 fi
 
+# Auto-convert to MOBI for Kindle recipients
+KINDLE_CONVERT=false
+CONVERTED_FILE=""
+if echo "$TO" | grep -qi "kindle.com"; then
+    EXT="${FILE##*.}"
+    if [ "$EXT" != "mobi" ] && [ "$EXT" != "pdf" ]; then
+        if command -v ebook-convert >/dev/null 2>&1; then
+            CONVERTED_FILE="/tmp/$(basename "${FILE%.*}").mobi"
+            echo "Converting to MOBI for Kindle..." >&2
+            ebook-convert "$FILE" "$CONVERTED_FILE" --output-profile kindle 2>/dev/null
+            FILE="$CONVERTED_FILE"
+            KINDLE_CONVERT=true
+            echo "Conversion complete." >&2
+        else
+            echo "Warning: ebook-convert not found. Sending original format (may fail on Kindle)." >&2
+        fi
+    fi
+fi
+
 CLAWCODE_DIR="${CLAWCODE_DIR:-$HOME/clawcode}"
 ENV_FILE="$CLAWCODE_DIR/.env"
 
@@ -112,5 +131,9 @@ if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
     echo "Sent successfully. Message ID: ${MSG_ID}"
 else
     echo "Error (HTTP ${HTTP_CODE}): ${BODY_RESPONSE}" >&2
+    [ -n "$CONVERTED_FILE" ] && rm -f "$CONVERTED_FILE"
     exit 1
 fi
+
+# Clean up converted file
+[ -n "$CONVERTED_FILE" ] && rm -f "$CONVERTED_FILE"
