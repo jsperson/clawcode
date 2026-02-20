@@ -78,6 +78,19 @@ gmail_draft_delete        — Delete a draft
 gmail_attachment_get      — Download an attachment by message and attachment ID
 ```
 
+**Sending attachments:** The MCP `gmail_message_send` does NOT support file attachments. To send an email with a file attached, use the script via Bash:
+
+```bash
+~/clawcode/scripts/gmail-send-attachment.sh <to> <subject> <body> <file>
+```
+
+Supports HTML, PDF, DOCX, EPUB, MOBI, TXT. Uses the same OAuth credentials as gmail-mcp.
+
+**Kindle:** To send documents to Scott's Kindle:
+```bash
+~/clawcode/scripts/gmail-send-attachment.sh jsperson_PuR3Fa@kindle.com "Title" "See attached." /path/to/file.html
+```
+
 ### Filters & Settings
 
 ```
