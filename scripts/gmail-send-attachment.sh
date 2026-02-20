@@ -119,3 +119,4 @@ fi
 
 # Clean up converted file
 [ -n "$CONVERTED_FILE" ] && rm -f "$CONVERTED_FILE"
+exit 0
