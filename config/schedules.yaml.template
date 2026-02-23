@@ -41,6 +41,11 @@ schedules:
     prompt: "Run /life:overnight"
     enabled: true
 
+  life_evening:
+    cron: "0 21 * * *"
+    prompt: "Run /life:evening"
+    enabled: true
+
   daily_digest:
     cron: "0 7 * * *"
     script: "bash ~/clawcode/scripts/daily-digest.sh"
