@@ -43,7 +43,29 @@ schedules:
 
   life_evening:
     cron: "0 21 * * *"
-    prompt: "Run /life:evening"
+    prompt: >
+      Post a brief message to the user: "Evening review time. Say /life:evening when you're ready."
+      Do NOT run the evening review itself. Just post the nudge and exit.
+    enabled: true
+
+  life_evening_fallback:
+    cron: "45 1 * * *"
+    prompt: >
+      Check if an evening review was already written for yesterday.
+
+      Step 1: Determine yesterday's date:
+      TZ='America/Chicago' date -v-1d +%Y-%m-%d
+
+      Step 2: Read the Life Agent config pointer at ~/.claude/life-agent/config.yaml
+      to get the data_path.
+
+      Step 3: Check if {data_path}/reviews/daily/{YESTERDAY}.md exists.
+
+      If the review exists: respond with "Evening review already exists for {YESTERDAY}. Skipping fallback."
+
+      If no review exists: run /life:evening --auto {YESTERDAY}
+
+      This ensures the overnight planner (which runs at 02:00) always has review data.
     enabled: true
 
   daily_digest:
