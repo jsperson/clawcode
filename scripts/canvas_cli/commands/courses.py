@@ -50,8 +50,7 @@ def register(subparsers):
 def cmd_courses(args):
     """List enrolled courses."""
     canvas = get_canvas()
-    user = canvas.get_current_user()
-    courses = user.get_courses(enrollment_state='active')
+    courses = get_courses_list(canvas)
     result = [course_to_dict(course) for course in courses]
     result.sort(key=lambda x: x.get('name', ''))
     output(result)

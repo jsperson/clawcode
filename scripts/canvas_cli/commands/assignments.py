@@ -81,13 +81,15 @@ def cmd_assignments(args):
                 adict = assignment_to_dict(a)
                 adict['course_name'] = course.name
 
-                if cutoff and adict['due_at']:
+                if cutoff:
+                    if not adict['due_at']:
+                        continue
                     try:
                         due = datetime.fromisoformat(getattr(a, 'due_at', '').replace('Z', '+00:00'))
                         if due < now or due > cutoff:
                             continue
                     except Exception:
-                        pass
+                        continue
 
                 result.append(adict)
         except Exception:
