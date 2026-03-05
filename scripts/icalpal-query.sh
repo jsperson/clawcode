@@ -104,18 +104,24 @@ done
 # Calendars to exclude — macOS auto-detected phantom events
 EXCLUDED_CALS='["Found in Natural Language", "Found in Mail"]'
 
+# Common jq filter: exclude phantom calendars + recurring events past their end date
+# icalpal bug: recurring "nth weekday" events generate one extra occurrence past rend_date.
+# sseconds holds the *original* event epoch, not the occurrence date. sctime/rctime hold
+# human-readable timestamps (YYYY-MM-DD HH:MM:SS ±TZ) that compare lexicographically.
+COMMON_FILTER='select(.calendar as $c | $excl | index($c) | not) | select((.has_recurrences == 1 and .rctime != null and .sctime > .rctime) | not)'
+
 # Output results
 if [ -s "$ICAL_OUT" ]; then
     if [ "$COMPACT" = true ]; then
         if [ "$IS_TASKS" = true ]; then
-            jq --argjson excl "$EXCLUDED_CALS" '[.[] | select(.calendar as $c | $excl | index($c) | not) | {title: .title, calendar: .calendar, due: .sdate, priority: .priority, completed: (.status == 1)}]' "$ICAL_OUT"
+            jq --argjson excl "$EXCLUDED_CALS" "[.[] | $COMMON_FILTER | {title: .title, calendar: .calendar, due: .sdate, priority: .priority, completed: (.status == 1)}]" "$ICAL_OUT"
         else
-            jq --argjson excl "$EXCLUDED_CALS" '[.[] | select(.calendar as $c | $excl | index($c) | not) | {date: .sdate, start: .sctime[11:16], end: .ectime[11:16], title: .title, calendar: .calendar, location: .location, all_day: (.all_day == 1)}]' "$ICAL_OUT"
+            jq --argjson excl "$EXCLUDED_CALS" "[.[] | $COMMON_FILTER | {date: .sdate, start: .sctime[11:16], end: .ectime[11:16], title: .title, calendar: .calendar, location: .location, all_day: (.all_day == 1)}]" "$ICAL_OUT"
         fi
     else
         # For JSON output, filter excluded calendars; for non-JSON, pass through as-is
         if python3 -c "import sys,json; json.load(open(sys.argv[1]))" "$ICAL_OUT" 2>/dev/null; then
-            jq --argjson excl "$EXCLUDED_CALS" '[.[] | select(.calendar as $c | $excl | index($c) | not)]' "$ICAL_OUT"
+            jq --argjson excl "$EXCLUDED_CALS" "[.[] | $COMMON_FILTER]" "$ICAL_OUT"
         else
             cat "$ICAL_OUT"
         fi
