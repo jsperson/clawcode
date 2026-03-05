@@ -101,16 +101,24 @@ for i in $(seq 1 40); do
     sleep 0.25
 done
 
+# Calendars to exclude — macOS auto-detected phantom events
+EXCLUDED_CALS='["Found in Natural Language", "Found in Mail"]'
+
 # Output results
 if [ -s "$ICAL_OUT" ]; then
     if [ "$COMPACT" = true ]; then
         if [ "$IS_TASKS" = true ]; then
-            jq '[.[] | {title: .title, calendar: .calendar, due: .sdate, priority: .priority, completed: (.status == 1)}]' "$ICAL_OUT"
+            jq --argjson excl "$EXCLUDED_CALS" '[.[] | select(.calendar as $c | $excl | index($c) | not) | {title: .title, calendar: .calendar, due: .sdate, priority: .priority, completed: (.status == 1)}]' "$ICAL_OUT"
         else
-            jq '[.[] | {date: .sdate, start: .sctime[11:16], end: .ectime[11:16], title: .title, calendar: .calendar, location: .location, all_day: (.all_day == 1)}]' "$ICAL_OUT"
+            jq --argjson excl "$EXCLUDED_CALS" '[.[] | select(.calendar as $c | $excl | index($c) | not) | {date: .sdate, start: .sctime[11:16], end: .ectime[11:16], title: .title, calendar: .calendar, location: .location, all_day: (.all_day == 1)}]' "$ICAL_OUT"
         fi
     else
-        cat "$ICAL_OUT"
+        # For JSON output, filter excluded calendars; for non-JSON, pass through as-is
+        if python3 -c "import sys,json; json.load(open(sys.argv[1]))" "$ICAL_OUT" 2>/dev/null; then
+            jq --argjson excl "$EXCLUDED_CALS" '[.[] | select(.calendar as $c | $excl | index($c) | not)]' "$ICAL_OUT"
+        else
+            cat "$ICAL_OUT"
+        fi
     fi
 fi
 
