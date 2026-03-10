@@ -26,12 +26,17 @@ servers:
     required_by: [gmail]
     setup_notes: "Run scripts/gmail-oauth-setup.sh for one-time Google OAuth authorization."
 
-  playwright:
+  browser:
     transport: stdio
-    command: npx
-    args: ["@playwright/mcp@latest", "--browser", "chrome", "--headless"]
-    required_by: []
-    setup_notes: "Browser automation via Playwright (headless Chrome)."
+    command: node
+    args: ["mcp-servers/browser/index.js"]
+    env:
+      BROWSER_TIMEOUT: "30000"
+    required_by: [browser]
+    setup_notes: >
+      Browser automation via OpenClaw CLI wrapping Chrome DevTools Protocol.
+      Requires: OpenClaw gateway running (openclaw browser start),
+      Chrome extension "OpenClaw Browser Relay" installed and attached.
 
   qmd:
     transport: stdio

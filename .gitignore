@@ -26,6 +26,9 @@ proposals/
 .mcp.json
 data/playwright-profile/
 
+# Node
+node_modules/
+
 # Data and state
 data/state.json
 data/logs/

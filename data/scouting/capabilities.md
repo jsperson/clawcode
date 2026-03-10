@@ -1,6 +1,6 @@
 # ClawCode Capability Summary
 
-Last updated: 2026-02-22
+Last updated: 2026-03-10
 
 This file helps the scouting agent understand what ClawCode already does, so it can identify genuinely novel capabilities worth exploring.
 
@@ -36,12 +36,12 @@ This file helps the scouting agent understand what ClawCode already does, so it 
 - **Apple Reminders** — icalpal CLI wrapper for querying/completing tasks (6 lists: Home, Consulting, School, Family, Shopping, Side Projects)
 - **Calendar** — icalpal CLI wrapper for events
 - **QMD** — MCP server for semantic + keyword search across vault and memory
-- **Playwright** — MCP server for browser automation
+- **Browser** — Custom MCP server wrapping OpenClaw CLI for reliable browser automation (CDP relay + Chrome extension, persistent sessions)
 - **Docker** — Docker Desktop installed, available for sandbox experimentation
 
 ## Skills
 
-- apple-reminders, calendar, canvas, daily-digest, gmail, icalpal, notes-inbound, scheduler, scott-vault
+- apple-reminders, browser, calendar, canvas, daily-digest, gmail, icalpal, notes-inbound, scheduler, scott-vault
 
 ## Scripts
 
