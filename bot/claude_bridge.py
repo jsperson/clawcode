@@ -246,7 +246,12 @@ class ClaudeBridge:
 
         if proc.returncode != 0:
             err_text = stderr.decode("utf-8", errors="replace").strip()
-            logger.error("Claude Code failed (rc=%d): %s", proc.returncode, err_text)
+            out_text = stdout.decode("utf-8", errors="replace").strip()
+            logger.error(
+                "Claude Code failed (rc=%d) stderr=%r stdout=%r cmd=%s",
+                proc.returncode, err_text[:500], out_text[:500],
+                " ".join(cmd[:6]),  # log first few args for debugging
+            )
             # If session conflict, invalidate and retry with fresh session
             if "already in use" in err_text:
                 logger.info("Session conflict — creating fresh session for channel %s", channel_id)
