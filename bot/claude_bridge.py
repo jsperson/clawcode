@@ -258,6 +258,14 @@ class ClaudeBridge:
                 logger.warning("Context too large for session %s — clearing", session.session_id[:8])
                 del self._sessions[channel_id]
                 raise ContextTooLargeError(f"Session context exceeded limit: {err_text}")
+            # Unknown failure with existing session — clear and raise so next
+            # invocation starts fresh instead of retrying the same broken session
+            if session.message_count > 0:
+                logger.warning(
+                    "Session %s failed (rc=%d) after %d messages — clearing to avoid retry loop",
+                    session.session_id[:8], proc.returncode, session.message_count,
+                )
+                del self._sessions[channel_id]
             raise RuntimeError(f"Claude Code exited with code {proc.returncode}: {err_text}")
 
         session.message_count += 1
