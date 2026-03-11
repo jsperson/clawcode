@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# backup.sh — Rsync ~/clawcode to iCloud Drive for backup (nightly)
+# backup.sh — Rsync ~/clawcode and ~/.claude to iCloud Drive for backup (nightly)
 set -euo pipefail
 
-SRC="$HOME/clawcode/"
-DEST="$HOME/Library/Mobile Documents/com~apple~CloudDocs/clawcode_backup/"
+ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 
-mkdir -p "$DEST"
+# --- ClawCode ---
+CLAWCODE_SRC="$HOME/clawcode/"
+CLAWCODE_DEST="$ICLOUD/clawcode_backup/"
+mkdir -p "$CLAWCODE_DEST"
 
 rsync -a --delete \
     --exclude '__pycache__' \
@@ -14,7 +16,26 @@ rsync -a --delete \
     --exclude 'data/logs/' \
     --exclude 'data/playwright-profile/' \
     --exclude '.playwright-mcp/' \
-    "$SRC" "$DEST"
+    "$CLAWCODE_SRC" "$CLAWCODE_DEST"
 
-SIZE=$(du -sh "$DEST" | cut -f1)
-echo "Backup complete: $SIZE synced to iCloud Drive"
+CLAWCODE_SIZE=$(du -sh "$CLAWCODE_DEST" | cut -f1)
+
+# --- Claude Code config ---
+CLAUDE_SRC="$HOME/.claude/"
+CLAUDE_DEST="$ICLOUD/claude_config_backup/"
+mkdir -p "$CLAUDE_DEST"
+
+rsync -a --delete \
+    --exclude 'debug/' \
+    --exclude 'shell-snapshots/' \
+    --exclude 'session-env/' \
+    --exclude 'todos/' \
+    --exclude 'tasks/' \
+    --exclude 'plans/' \
+    --exclude 'statsig/' \
+    --exclude 'plugins/cache/' \
+    "$CLAUDE_SRC" "$CLAUDE_DEST"
+
+CLAUDE_SIZE=$(du -sh "$CLAUDE_DEST" | cut -f1)
+
+echo "Backup complete: clawcode=$CLAWCODE_SIZE, claude=$CLAUDE_SIZE synced to iCloud Drive"
