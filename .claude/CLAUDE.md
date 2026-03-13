@@ -43,7 +43,6 @@ Read `USER.md` in the project root for Scott's profile, preferences, and communi
 
 | Content type | Destination |
 |---|---|
-| Quick capture / unsorted | `Inbox/` |
 | Simple task/todo | Apple Reminders via `remindctl` or Siri |
 | Active work with deadlines | `Projects/<ProjectName>/` (create folder) |
 | Research link or idea | `Ideas/` |
