@@ -37,6 +37,27 @@ Read `USER.md` in the project root for Scott's profile, preferences, and communi
 - Run `clawcode memory search "<query>"` — keyword-only, covers MEMORY.md + daily logs
 - Use `--source memory` for curated knowledge, `--source daily` for logs
 
+## Obsidian Vault
+
+**Path:** `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott`
+
+| Content type | Destination |
+|---|---|
+| Quick capture / unsorted | `Inbox/` |
+| Simple task/todo | Apple Reminders via `remindctl` or Siri |
+| Active work with deadlines | `Projects/<ProjectName>/` (create folder) |
+| Research link or idea | `Ideas/` |
+| Handwritten note PDF | `Personal Notes/Inbound Notes/` |
+| Web clipping | `Clippings/` |
+| Draft or scratch work | `working/` |
+| Completed project | Move from `Projects/` to `Archive/` |
+
+**Formatting:** `YYYYMMDD` headers in content, `YYYY-MM-DD.md` for file names, standard markdown links (not wikilinks), per-note `./attachments/` folders.
+
+**Tasks live in Apple Reminders**, not Obsidian. Lists: Home, Consulting, School, Family, Shopping, Side Projects.
+
+For full vault structure details, read `skills/scott-vault/SKILL.md`.
+
 ## Key Paths
 
 - **Obsidian vault:** `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott`
