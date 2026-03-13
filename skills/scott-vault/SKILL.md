@@ -12,19 +12,27 @@ metadata:
 # Scott's Obsidian Vault
 
 **Vault path:** `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott/`
-iCloud-synced across devices. ~1,450 markdown files, ~2.8GB total.
+iCloud-synced across devices. ~1,500 markdown files, ~2.9GB total.
 
 ## Folder Structure
 
 ```
 scott/
-├── Inbox/                # Quick captures, unsorted items, triage landing zone
 ├── Ideas/                # Early-stage captures, reference links, things to explore
 ├── Projects/             # Active work (folder per project, with attachments/)
+│   ├── Agentic Development/
+│   ├── AI-Prompt-Championship/
+│   ├── AI-Workforce-Disruption/
 │   ├── ATI/              # Consulting (Tiber Solutions)
-│   ├── Newman-DataEngineering/  # Grad school coursework
-│   ├── House-Yard/       # Home maintenance
-│   └── ...
+│   ├── Browser-Automation/
+│   ├── ClawCode-Autonomy/
+│   ├── Cruise-March-2026/
+│   ├── DockerClawCode/
+│   ├── Learn to Code with Basketball/
+│   ├── Life-Agent/
+│   ├── Pi4to3-Migration/
+│   ├── Sphero/
+│   └── zz_SystemConfigs/
 ├── Personal Notes/       # Handwritten note digitization
 │   ├── Inbound Notes/         # Drop scanned PDFs here for OCR processing
 │   ├── zzArchivedPDFs/        # Processed originals (YYYYMMDD Notes.pdf)
@@ -32,20 +40,34 @@ scott/
 │   └── Personal-Notes-YYYY.md # Year-based chronological entries
 ├── Digests/
 │   ├── Daily/            # Auto-generated daily digests (YYYY-MM-DD.md)
-│   ├── Weekly/           # Weekly summaries (currently empty)
-│   └── Today.md          # Current day's digest
+│   ├── Weekly/           # Weekly summaries
+│   ├── Today.md          # Current day's digest
+│   └── ThisWeek.md       # Current week's digest
 ├── Trends/               # Weekly macro trends journal (YYYY-WNN.md)
-├── Clippings/            # Web clippings (currently empty)
+├── Quick Reference/      # Cheat sheets and quick-lookup docs
+├── life-agent/           # Life Agent data (plans, reviews, principles, observations)
+│   ├── plans/
+│   ├── reviews/
+│   ├── observations/
+│   ├── principles/
+│   ├── problems/
+│   ├── config.yaml
+│   └── user-profile.md
+├── tasks/
+│   └── active/           # Obsidian-tracked tasks (secondary to Apple Reminders)
+├── Clippings/            # Web clippings
 ├── working/              # Scratch/draft space for works-in-progress
-├── Archive/              # Legacy OneNote import (~1,380 files), searchable, rarely modified
+├── Archive/              # Legacy imports (~1,380 files), searchable, rarely modified
 │   ├── 1-Important Memories/  # Family voicemails, keepsakes
+│   ├── AI Use/           # AI-related references
 │   ├── Education/        # Certs & courses (Azure, Databricks, AWS, Newman, etc.)
 │   ├── Evernote/         # Paginated Evernote imports
 │   ├── Geek Stuff/       # Technical references (AI, Python, Power BI, etc.)
+│   ├── House-Yard/       # Home maintenance
 │   ├── Knowledge/        # Training notes, professional dev, FDIC work
 │   ├── Military Millions/# Business docs (J Squared LLC)
 │   ├── Personal/         # Property records, vehicles, kids, scouts, media
-│   ├── Tasks/            # Archived task files (legacy — tasks now in Apple Reminders)
+│   ├── Tasks/            # Archived task files (legacy)
 │   └── Work/             # Client/employer folders (FDIC, Tiber, etc.)
 ├── _attachments/         # Legacy vault-wide attachments
 └── attachments/          # Current vault-wide attachments
@@ -59,13 +81,14 @@ scott/
 
 | Content type | Destination |
 |---|---|
-| Quick capture / unsorted | `Inbox/` |
 | Simple task/todo | Apple Reminders via `remindctl` or Siri |
 | Active work with deadlines | `Projects/<ProjectName>/` (create folder) |
 | Research link or idea | `Ideas/` |
 | Handwritten note PDF | `Personal Notes/Inbound Notes/` |
 | Web clipping | `Clippings/` |
 | Draft or scratch work | `working/` |
+| Quick reference / cheat sheet | `Quick Reference/` |
+| Life Agent data | `life-agent/` (managed by Life Agent skill) |
 | Completed project | Move from `Projects/` to `Archive/` |
 | Everything else | Ask Scott |
 
@@ -92,10 +115,11 @@ PDF → `Inbound Notes/` → OCR → `Personal-Notes-YYYY.md` (with `YYYYMMDD` h
 
 ## Task System
 
-**Tasks live in Apple Reminders**, not Obsidian.
-
+**Primary: Apple Reminders** — not Obsidian.
 **Lists:** Home, Consulting, School, Family, Shopping, Side Projects
 **Capture:** Siri, iPhone/Watch, or `remindctl` via Computer
+
+**Secondary:** `tasks/active/` in the vault for tasks that benefit from longer-form markdown tracking.
 
 ## Formatting Conventions
 
