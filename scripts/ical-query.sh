@@ -31,8 +31,14 @@ fi
 
 ICAL_BIN="$(command -v ical 2>/dev/null || echo "$HOME/.local/bin/ical")"
 
+# Always exclude Siri Suggestions calendar (phantom events from iMessage parsing)
+DEFAULT_EXCLUDES=(--exclude-calendar "Found in Natural Language")
+
 # Build the ical command string with proper quoting
 ICAL_CMD="$ICAL_BIN"
+for arg in "${DEFAULT_EXCLUDES[@]}"; do
+    ICAL_CMD="$ICAL_CMD $(printf '%q' "$arg")"
+done
 for arg in "$@"; do
     ICAL_CMD="$ICAL_CMD $(printf '%q' "$arg")"
 done
