@@ -3,7 +3,7 @@
 set -euo pipefail
 
 CLAWCODE_DIR="$HOME/clawcode"
-CLAUDE="$HOME/.npm-global/bin/claude"
+CLAUDE="$HOME/.local/bin/claude"
 VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
 VENV_PYTHON="$CLAWCODE_DIR/.venv/bin/python"
 CONTEXT_CACHE="$CLAWCODE_DIR/data/context.cache"

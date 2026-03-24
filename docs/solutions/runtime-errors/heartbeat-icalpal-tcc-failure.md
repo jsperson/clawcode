@@ -59,6 +59,6 @@ The heartbeat prompt is injected into a Claude session that reads HEARTBEAT.md a
 
 ## Related
 
-- `scripts/icalpal-query.sh` — launchd one-shot wrapper for TCC bypass
-- `skills/icalpal/SKILL.md` — icalpal skill (documents wrapper requirement)
-- MEMORY.md "Calendar (icalpal)" section — operational notes on the wrapper
+- `scripts/ical-query.sh` — launchd one-shot wrapper for TCC bypass (replaced icalpal-query.sh)
+- `skills/calendar-ical/SKILL.md` — ical CLI skill (documents wrapper requirement)
+- The same TCC pattern applies to the `ical` CLI (EventKit-based) — Calendar permission is attributed to the parent process, so launchd wrapping is still required from Python contexts

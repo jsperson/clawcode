@@ -104,7 +104,7 @@ Accepted by `--due` and date filters:
 
 ## Calendar Events
 
-For calendar event queries and creation, use `clawcal` (see the calendar skill).
+For calendar event queries and creation, use `ical` (see the calendar skill).
 
 ## Tips
 
@@ -112,4 +112,4 @@ For calendar event queries and creation, use `clawcal` (see the calendar skill).
 - Use `jq` for filtering and formatting JSON results
 - When creating reminders, pick the most appropriate list from Scott's lists above
 - Default to "Home" list for general personal reminders
-- For morning briefings, combine `remindctl-query.sh today` + `remindctl-query.sh overdue` + `clawcal events`
+- For morning briefings, combine `remindctl-query.sh today` + `remindctl-query.sh overdue` + `ical today -o json`

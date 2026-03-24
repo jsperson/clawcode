@@ -11,7 +11,7 @@ metadata:
     requires:
       bins:
         - remindctl
-        - icalpal
+        - ical
         - jq
 ---
 
@@ -23,7 +23,7 @@ Generates a comprehensive daily digest and saves it to the Obsidian vault.
 
 Runs `scripts/daily-digest.sh` which collects:
 - **Tasks** from Apple Reminders (overdue, due today, all active by list)
-- **Calendar** events for today via icalpal
+- **Calendar** events for today via ical CLI
 - **Project** files modified in last 24 hours
 - **Canvas** LMS data (grades, assignments, discussions, announcements)
 
@@ -44,7 +44,7 @@ Scheduled via `config/schedules.yaml` as `daily_digest` (07:00 daily).
 ## Dependencies
 
 - `remindctl` — Apple Reminders CLI
-- `icalpal` — macOS Calendar CLI
+- `ical` — macOS Calendar CLI (native EventKit)
 - `jq` — JSON processor
 - `canvasapi` Python package — Canvas LMS integration (optional)
 - Canvas token at `~/.config/canvas/token` (optional)

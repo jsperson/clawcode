@@ -106,9 +106,9 @@ fi
 # === COLLECT CALENDAR EVENTS (today) ===
 CALENDAR_LIST=""
 CALENDAR_COUNT=0
-CLAWCAL="$SCRIPT_DIR/../bin/clawcal"
-if [ -x "$CLAWCAL" ]; then
-  calendar_json=$("$CLAWCAL" events --exclude "Birthdays,Found in Natural Language" 2>/dev/null || echo "[]")
+ICAL_QUERY="$SCRIPT_DIR/ical-query.sh"
+if [ -x "$ICAL_QUERY" ]; then
+  calendar_json=$("$ICAL_QUERY" today --exclude-calendar Birthdays --exclude-calendar "Found in Natural Language" -o json 2>/dev/null || echo "[]")
 
   while IFS= read -r event; do
     if [ -n "$event" ] && [ "$event" != "null" ]; then
@@ -116,10 +116,10 @@ if [ -x "$CLAWCAL" ]; then
       CALENDAR_LIST="$CALENDAR_LIST
 $event"
     fi
-  done < <(echo "$calendar_json" | jq -r '.[] | "- **\(.start // "all day")** \(.title)"' 2>/dev/null)
+  done < <(echo "$calendar_json" | jq -r '.[] | "- **\(.start_date // "all day")** \(.title)"' 2>/dev/null)
 else
   CALENDAR_LIST="
-- clawcal not compiled (run scripts/install.sh)"
+- ical-query.sh not found"
 fi
 
 # === GENERATE DIGEST FILE ===

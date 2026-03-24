@@ -251,11 +251,10 @@ Skills are modular capability definitions that teach Claude how to use specific 
 | Skill | Description | Requires |
 |-------|-------------|----------|
 | **apple-reminders** | Create, list, complete, and query Apple Reminders | `remindctl` binary (macOS) |
-| **calendar** | Read and create macOS Calendar events via EventKit | `clawcal` binary (macOS) |
+| **calendar-ical** | Read and create macOS Calendar events via native EventKit | `ical` CLI (macOS) |
 | **canvas** | Query Newman University Canvas LMS — assignments, grades, submissions, quizzes (112 commands) | Python 3 |
-| **daily-digest** | Generate morning briefing with calendar, tasks, projects, and Canvas data | `remindctl`, `icalpal`, `jq` |
+| **daily-digest** | Generate morning briefing with calendar, tasks, projects, and Canvas data | `remindctl`, `ical`, `jq` |
 | **gmail** | Search, read, send, draft, archive, and label emails via 40+ MCP tools | `gmail-mcp` server |
-| **icalpal** | Read-only calendar and reminders queries (alternative to clawcal) | `icalpal` binary (macOS) |
 | **notes-inbound** | OCR and archive handwritten note PDFs from Obsidian Inbox | `pdftoppm` |
 | **scheduler** | Add, modify, enable/disable recurring scheduled tasks via launchd | `launchctl` (macOS) |
 | **scott-vault** | Obsidian vault structure, folder routing, and content filing conventions | macOS |
@@ -347,7 +346,7 @@ Skills are modular capability definitions that teach Claude how to use specific 
     doctor.py               # Health check (dependencies, config, permissions)
     backup.sh               # Vault backup
   skills/                   # Skill definitions (SKILL.md per capability)
-  bin/                      # Compiled binaries (clawcal)
+  bin/                      # Compiled binaries
   ClawCode.app/             # macOS .app bundle for TCC permissions
   ClawCodeGateway.app/      # Gateway .app bundle
   SOUL.md                   # Agent philosophy
