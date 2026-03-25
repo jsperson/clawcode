@@ -61,7 +61,7 @@ async function runOpenClaw(args, opts = {}) {
   try {
     const child = execFile(
       OPENCLAW_BIN,
-      ['browser', '--browser-profile', BROWSER_PROFILE, args[0], '--json', ...args.slice(1)],
+      ['browser', '--browser-profile', BROWSER_PROFILE, '--json', args[0], ...args.slice(1)],
       { maxBuffer: MAX_BUFFER, timeout }
     );
     activeChild = child.child ?? null;
