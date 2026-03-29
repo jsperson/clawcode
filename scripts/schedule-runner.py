@@ -203,12 +203,16 @@ def invoke_claude(prompt: str, config: dict) -> str:
 
     logger.info("Running: %s", " ".join(cmd[:4]) + " ...")
 
+    # Clean environment: remove CLAUDECODE to avoid nested-session detection
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
+
     result = subprocess.run(
         cmd,
         input=prompt,
         capture_output=True,
         text=True,
         cwd=project_dir,
+        env=env,
         timeout=600,
     )
 
