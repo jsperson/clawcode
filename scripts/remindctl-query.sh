@@ -35,10 +35,12 @@ for arg in "$@"; do
     REMIND_CMD="$REMIND_CMD $(printf '%q' "$arg")"
 done
 
-REMIND_OUT=$(mktemp /tmp/clawcode-remind-XXXXXX.out)
-REMIND_ERR=$(mktemp /tmp/clawcode-remind-XXXXXX.err)
-REMIND_RC=$(mktemp /tmp/clawcode-remind-XXXXXX.rc)
-REMIND_PLIST=$(mktemp /tmp/clawcode-remind-XXXXXX.plist)
+REMIND_OUT=$(mktemp /tmp/clawcode-remind-XXXXXX)
+REMIND_ERR=$(mktemp /tmp/clawcode-remind-XXXXXX)
+REMIND_RC=$(mktemp /tmp/clawcode-remind-XXXXXX)
+_PLIST_BASE=$(mktemp /tmp/clawcode-remind-XXXXXX)
+REMIND_PLIST="${_PLIST_BASE}.plist"
+mv "$_PLIST_BASE" "$REMIND_PLIST"
 REMIND_LABEL="com.clawcode.remindctl.$$"
 
 cleanup() {
