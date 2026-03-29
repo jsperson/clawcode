@@ -83,8 +83,8 @@ class MCPConfig:
 @dataclass
 class HeartbeatInProcessConfig:
     enabled: bool = True
-    interval_minutes: int = 30
-    full_scan_interval_minutes: int = 120
+    interval_minutes: int = 5
+    full_scan_interval_minutes: int = 30
     quiet_after_message_minutes: int = 5
     active_hours_start: str = "07:00"
     active_hours_end: str = "22:00"
@@ -243,8 +243,8 @@ class Config:
         hb_active = hb_ip_raw.get("active_hours", {}) or {}
         hb_in_process = HeartbeatInProcessConfig(
             enabled=hb_ip_raw.get("enabled", True),
-            interval_minutes=int(hb_ip_raw.get("interval_minutes", 30)),
-            full_scan_interval_minutes=int(hb_ip_raw.get("full_scan_interval_minutes", 120)),
+            interval_minutes=int(hb_ip_raw.get("interval_minutes", 5)),
+            full_scan_interval_minutes=int(hb_ip_raw.get("full_scan_interval_minutes", 30)),
             quiet_after_message_minutes=int(hb_ip_raw.get("quiet_after_message_minutes", 5)),
             active_hours_start=str(hb_active.get("start", "07:00")),
             active_hours_end=str(hb_active.get("end", "22:00")),

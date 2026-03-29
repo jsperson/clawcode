@@ -3,7 +3,7 @@ discord:
   guild_id: ${DISCORD_GUILD_ID}
 
 claude:
-  path: ~/.npm-global/bin/claude
+  path: ~/.local/bin/claude
   timeout_seconds: 1800
   session_expiry_minutes: 30
 
@@ -31,8 +31,8 @@ gateway:
 heartbeat:
   in_process:
     enabled: true
-    interval_minutes: 30
-    full_scan_interval_minutes: 120
+    interval_minutes: 5
+    full_scan_interval_minutes: 30
     quiet_after_message_minutes: 5
     active_hours:
       start: "07:00"

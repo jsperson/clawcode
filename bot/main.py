@@ -877,6 +877,64 @@ def create_bot(config: Config) -> discord.Client:
         end_minutes = end_h * 60 + end_m
         return start_minutes <= current_minutes < end_minutes
 
+    async def _should_run_heartbeat(is_full_scan: bool) -> bool:
+        """Pre-check gate: skip lightweight scans when nothing interesting is happening.
+
+        Full scans always run (they handle Canvas, proposals, decision maintenance).
+        Lightweight scans only run if:
+        - Calendar event starts within 30 minutes
+        - Overdue or due-today reminders exist
+        """
+        if is_full_scan:
+            return True
+
+        scripts_dir = Path(config.paths.project_dir) / "scripts"
+
+        async def _run_script(script: str, *args: str) -> str:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    str(scripts_dir / script), *args,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+                return stdout.decode().strip()
+            except (asyncio.TimeoutError, OSError) as e:
+                logger.debug("Heartbeat pre-check script %s failed: %s", script, e)
+                return ""
+
+        # Check calendar — events in next 30 minutes
+        cal_output = await _run_script("ical-query.sh", "today", "-o", "json")
+        if cal_output and cal_output != "[]":
+            try:
+                events = json.loads(cal_output)
+                now = datetime.now(TZ)
+                for ev in events:
+                    if ev.get("all_day"):
+                        continue
+                    start_str = ev.get("start_date", "")
+                    if not start_str:
+                        continue
+                    # Parse ISO datetime
+                    ev_start = datetime.fromisoformat(start_str)
+                    delta = (ev_start - now).total_seconds()
+                    if 0 < delta <= 1800:  # starts within 30 minutes
+                        logger.info("Heartbeat pre-check: event '%s' starts in %d min",
+                                    ev.get("title", "?"), int(delta // 60))
+                        return True
+            except (json.JSONDecodeError, ValueError, KeyError):
+                pass
+
+        # Check reminders — overdue or due today
+        for check in ("overdue", "today"):
+            output = await _run_script("remindctl-query.sh", check)
+            if output and "No reminders found" not in output:
+                logger.info("Heartbeat pre-check: %s reminders found", check)
+                return True
+
+        logger.debug("Heartbeat pre-check: nothing interesting — skipping lightweight cycle")
+        return False
+
     async def _heartbeat_loop() -> None:
         """Background heartbeat loop — runs inside the bot's event loop."""
         nonlocal _heartbeat_count
@@ -890,7 +948,7 @@ def create_bot(config: Config) -> discord.Client:
 
         # Wait one full interval before first heartbeat
         logger.info(
-            "Heartbeat loop started — interval=%dm, full_scan_every=%d cycles, quiet=%dm",
+            "Heartbeat loop started — interval=%dm, full_scan_every=%d cycles, quiet=%dm, pre-check=on",
             hb_cfg.interval_minutes, full_scan_every, hb_cfg.quiet_after_message_minutes,
         )
         await asyncio.sleep(interval)
@@ -913,6 +971,11 @@ def create_bot(config: Config) -> discord.Client:
                 # Determine scan type
                 _heartbeat_count += 1
                 is_full_scan = (_heartbeat_count % full_scan_every) == 0
+
+                # Pre-check gate — skip lightweight scans when nothing is happening
+                if not await _should_run_heartbeat(is_full_scan):
+                    await asyncio.sleep(interval)
+                    continue
 
                 scan_label = "full scan" if is_full_scan else "lightweight"
                 logger.info("Heartbeat cycle #%d (%s)", _heartbeat_count, scan_label)
