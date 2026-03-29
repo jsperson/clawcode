@@ -174,6 +174,12 @@ def invoke_script(script_cmd: str) -> str:
 def invoke_claude(prompt: str, config: dict) -> str:
     """Run Claude Code CLI and return the response text."""
     claude_path = expand_path(config["claude"]["path"])
+    if not Path(claude_path).exists():
+        raise FileNotFoundError(
+            f"Claude CLI not found at {claude_path} "
+            f"(from config/config.yaml → claude.path). "
+            f"Update the config to the correct path."
+        )
     project_dir = expand_path(config["paths"]["project_dir"])
     vault_path = expand_path(config["vault"]["path"])
 
