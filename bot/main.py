@@ -370,6 +370,17 @@ def create_bot(config: Config) -> discord.Client:
             proposals_dir.mkdir(exist_ok=True)
             (proposals_dir / "archive").mkdir(exist_ok=True)
 
+            # Guard against duplicate loops — on_ready can fire multiple times
+            # (e.g. on gateway RESUME). Cancel any existing task before spawning
+            # a new one to prevent concurrent heartbeat loops compounding cadence.
+            if _heartbeat_task and not _heartbeat_task.done():
+                logger.warning("Existing heartbeat task found in on_ready — cancelling before restart")
+                _heartbeat_task.cancel()
+                try:
+                    await _heartbeat_task
+                except asyncio.CancelledError:
+                    pass
+
             _heartbeat_task = asyncio.create_task(_heartbeat_loop())
             logger.info("In-process heartbeat started (interval=%dm)",
                         config.heartbeat.in_process.interval_minutes)
@@ -936,7 +947,12 @@ def create_bot(config: Config) -> discord.Client:
         return False
 
     async def _heartbeat_loop() -> None:
-        """Background heartbeat loop — runs inside the bot's event loop."""
+        """Background heartbeat loop — runs inside the bot's event loop.
+
+        Uses absolute monotonic wake-time scheduling to maintain a constant
+        cadence regardless of how long each cycle's processing takes or whether
+        the underlying sleep is interrupted early.
+        """
         nonlocal _heartbeat_count
 
         hb_cfg = config.heartbeat.in_process
@@ -944,28 +960,50 @@ def create_bot(config: Config) -> discord.Client:
         full_scan_every = max(1, hb_cfg.full_scan_interval_minutes // hb_cfg.interval_minutes)
         quiet_period = hb_cfg.quiet_after_message_minutes * 60
         channel_id = config.discord.channel_id
-        channel_id_str = str(channel_id)
 
-        # Wait one full interval before first heartbeat
         logger.info(
             "Heartbeat loop started — interval=%dm, full_scan_every=%d cycles, quiet=%dm, pre-check=on",
             hb_cfg.interval_minutes, full_scan_every, hb_cfg.quiet_after_message_minutes,
         )
-        await asyncio.sleep(interval)
+
+        loop = asyncio.get_event_loop()
+        next_wake = loop.time() + interval
 
         while True:
+            # Sleep until the absolute target wake time. If asyncio.sleep returns
+            # early for any reason (gateway events, signals, etc.), loop back and
+            # keep sleeping until we actually reach next_wake.
+            try:
+                while True:
+                    remaining = next_wake - loop.time()
+                    if remaining <= 0:
+                        break
+                    sleep_start = loop.time()
+                    await asyncio.sleep(remaining)
+                    sleep_actual = loop.time() - sleep_start
+                    if sleep_actual < remaining * 0.8:
+                        logger.warning(
+                            "Heartbeat sleep drift: target=%.1fs actual=%.1fs (re-sleeping)",
+                            remaining, sleep_actual,
+                        )
+            except asyncio.CancelledError:
+                logger.info("Heartbeat loop cancelled")
+                return
+
+            # Schedule the next wake BEFORE processing — keeps cadence constant
+            # even if this cycle's work takes a while.
+            next_wake = loop.time() + interval
+
             try:
                 # Check active hours
                 if not _in_active_hours():
                     logger.debug("Heartbeat skipped — outside active hours")
-                    await asyncio.sleep(interval)
                     continue
 
                 # Check quiet period
                 now_mono = time.monotonic()
                 if _last_user_message_time > 0 and (now_mono - _last_user_message_time) < quiet_period:
                     logger.debug("Heartbeat skipped — quiet period (user messaged recently)")
-                    await asyncio.sleep(interval)
                     continue
 
                 # Determine scan type
@@ -974,7 +1012,6 @@ def create_bot(config: Config) -> discord.Client:
 
                 # Pre-check gate — skip lightweight scans when nothing is happening
                 if not await _should_run_heartbeat(is_full_scan):
-                    await asyncio.sleep(interval)
                     continue
 
                 scan_label = "full scan" if is_full_scan else "lightweight"
@@ -990,12 +1027,6 @@ def create_bot(config: Config) -> discord.Client:
                 return
             except Exception:
                 logger.exception("Heartbeat loop error — will retry next cycle")
-
-            try:
-                await asyncio.sleep(interval)
-            except asyncio.CancelledError:
-                logger.info("Heartbeat loop cancelled")
-                return
 
     async def _inject_heartbeat(channel_id: int, prompt: str) -> None:
         """Inject a heartbeat into the message processing pipeline."""
