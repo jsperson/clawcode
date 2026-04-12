@@ -55,6 +55,12 @@ scott/
 │   └── user-profile.md
 ├── tasks/
 │   └── active/           # Obsidian-tracked tasks (secondary to Apple Reminders)
+├── Entities/             # Entity graph — auto-maintained knowledge pages
+│   ├── People/           # Named individuals (not Scott)
+│   ├── Projects/         # Software projects, initiatives
+│   ├── Courses/          # Academic courses
+│   ├── Organizations/    # Companies, universities, groups
+│   └── Tools/            # Software tools, frameworks, services
 ├── Clippings/            # Web clippings
 ├── working/              # Scratch/draft space for works-in-progress
 ├── Archive/              # Legacy imports (~1,380 files), searchable, rarely modified
@@ -69,8 +75,7 @@ scott/
 │   ├── Personal/         # Property records, vehicles, kids, scouts, media
 │   ├── Tasks/            # Archived task files (legacy)
 │   └── Work/             # Client/employer folders (FDIC, Tiber, etc.)
-├── _attachments/         # Legacy vault-wide attachments
-└── attachments/          # Current vault-wide attachments
+└── attachments/          # Vault-wide attachments
 ```
 
 **Notes:**
@@ -90,6 +95,7 @@ scott/
 | Quick reference / cheat sheet | `Quick Reference/` |
 | Life Agent data | `life-agent/` (managed by Life Agent skill) |
 | Completed project | Move from `Projects/` to `Archive/` |
+| Entity knowledge (person, project, tool) | `Entities/{type}/` (auto-maintained) |
 | Everything else | Ask Scott |
 
 ## Workflows
@@ -107,6 +113,13 @@ PDF → `Inbound Notes/` → OCR → `Personal-Notes-YYYY.md` (with `YYYYMMDD` h
 **Schedule:** Mondays at 03:00 via ClawCode
 **Output:** `Trends/YYYY-WNN.md`
 **Tags:** `#signal`, `#narrative-shift`, `#contrarian`, `#confirmed`, `#thread/[name]`
+
+### Entity Graph
+**Schedule:** Daily at 07:00 via ClawCode (after daily_summary at 06:30)
+**Script:** `scripts/entity-graph.py`
+**Output:** `Entities/{People,Projects,Courses,Organizations,Tools}/*.md`
+**Format:** Each entity page has Compiled Truth (curated current state) + Timeline (dated entries) + Relationships (markdown links to other entities). Obsidian graph view and backlinks work natively.
+**Manual:** `entity-graph.py --backfill N` to reprocess last N days, `--seed` to reset aliases, `--regenerate` to refresh all compiled truths.
 
 ### Project Lifecycle
 1. Create folder in `Projects/`
