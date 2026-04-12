@@ -43,15 +43,16 @@ for arg in "$@"; do
     ICAL_CMD="$ICAL_CMD $(printf '%q' "$arg")"
 done
 
-ICAL_OUT=$(mktemp /tmp/clawcode-ical-XXXXXX.out)
-ICAL_ERR=$(mktemp /tmp/clawcode-ical-XXXXXX.err)
-ICAL_RC=$(mktemp /tmp/clawcode-ical-XXXXXX.rc)
-ICAL_PLIST=$(mktemp /tmp/clawcode-ical-XXXXXX.plist)
+ICAL_TMPDIR=$(mktemp -d /tmp/clawcode-ical-XXXXXXXX)
+ICAL_OUT="$ICAL_TMPDIR/out"
+ICAL_ERR="$ICAL_TMPDIR/err"
+ICAL_RC="$ICAL_TMPDIR/rc"
+ICAL_PLIST="$ICAL_TMPDIR/plist"
 ICAL_LABEL="com.clawcode.ical.$$"
 
 cleanup() {
     launchctl bootout "gui/$(id -u)/$ICAL_LABEL" 2>/dev/null || true
-    rm -f "$ICAL_OUT" "$ICAL_ERR" "$ICAL_RC" "$ICAL_PLIST"
+    rm -rf "$ICAL_TMPDIR"
 }
 trap cleanup EXIT
 
