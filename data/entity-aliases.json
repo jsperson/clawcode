@@ -1,0 +1,219 @@
+{
+  "entities": {
+    "person:David Cochran": {
+      "type": "person",
+      "aliases": [
+        "Dr. Cochran",
+        "Cochran",
+        "David"
+      ],
+      "filename": "David-Cochran.md",
+      "first_seen": "2026-04-12"
+    },
+    "person:Robert Norman": {
+      "type": "person",
+      "aliases": [
+        "Norman"
+      ],
+      "filename": "Robert-Norman.md",
+      "first_seen": "2026-04-12"
+    },
+    "organization:Newman University": {
+      "type": "organization",
+      "aliases": [
+        "Newman"
+      ],
+      "filename": "Newman-University.md",
+      "first_seen": "2026-04-12"
+    },
+    "organization:Tiber Solutions": {
+      "type": "organization",
+      "aliases": [
+        "Tiber"
+      ],
+      "filename": "Tiber-Solutions.md",
+      "first_seen": "2026-04-12"
+    },
+    "course:Data Preprocessing": {
+      "type": "course",
+      "aliases": [
+        "DSCI-6423",
+        "Data Preprocessing"
+      ],
+      "filename": "Data-Preprocessing.md",
+      "first_seen": "2026-04-12"
+    },
+    "course:Data Engineering": {
+      "type": "course",
+      "aliases": [
+        "DSCI-6313"
+      ],
+      "filename": "Data-Engineering.md",
+      "first_seen": "2026-04-12"
+    },
+    "course:Data Analysis and Visualization": {
+      "type": "course",
+      "aliases": [
+        "Data Analysis",
+        "DAV"
+      ],
+      "filename": "Data-Analysis-and-Visualization.md",
+      "first_seen": "2026-04-12"
+    },
+    "course:Data Analytics Seminar": {
+      "type": "course",
+      "aliases": [
+        "Analytics Seminar"
+      ],
+      "filename": "Data-Analytics-Seminar.md",
+      "first_seen": "2026-04-12"
+    },
+    "project:ClawCode": {
+      "type": "project",
+      "aliases": [
+        "Clawcode",
+        "clawcode"
+      ],
+      "filename": "ClawCode.md",
+      "first_seen": "2026-04-12"
+    },
+    "project:Life Agent": {
+      "type": "project",
+      "aliases": [
+        "life-agent",
+        "Life-Agent"
+      ],
+      "filename": "Life-Agent.md",
+      "first_seen": "2026-04-12"
+    },
+    "project:GBrain": {
+      "type": "project",
+      "aliases": [
+        "gbrain"
+      ],
+      "filename": "GBrain.md",
+      "first_seen": "2026-04-12"
+    },
+    "tool:Claude Code": {
+      "type": "tool",
+      "aliases": [
+        "claude-code",
+        "Claude CLI"
+      ],
+      "filename": "Claude-Code.md",
+      "first_seen": "2026-04-12"
+    },
+    "tool:Hermes Agent": {
+      "type": "tool",
+      "aliases": [
+        "Hermes",
+        "hermes"
+      ],
+      "filename": "Hermes-Agent.md",
+      "first_seen": "2026-04-12"
+    },
+    "tool:QMD": {
+      "type": "tool",
+      "aliases": [
+        "qmd"
+      ],
+      "filename": "QMD.md",
+      "first_seen": "2026-04-12"
+    },
+    "person:Jennifer Person": {
+      "type": "person",
+      "aliases": [
+        "Jen",
+        "Jennifer"
+      ],
+      "filename": "Jennifer-Person.md",
+      "first_seen": "2026-04-12"
+    },
+    "person:Ellie Person": {
+      "type": "person",
+      "aliases": [
+        "Ellie",
+        "Elizabeth"
+      ],
+      "filename": "Ellie-Person.md",
+      "first_seen": "2026-04-12"
+    },
+    "person:Jason Person": {
+      "type": "person",
+      "aliases": [
+        "Jason"
+      ],
+      "filename": "Jason-Person.md",
+      "first_seen": "2026-04-12"
+    },
+    "person:Kent Haury": {
+      "type": "person",
+      "aliases": [
+        "Kent"
+      ],
+      "filename": "Kent-Haury.md",
+      "first_seen": "2026-04-12"
+    },
+    "person:Garry Tan": {
+      "type": "person",
+      "aliases": [
+        "Tan"
+      ],
+      "filename": "Garry-Tan.md",
+      "first_seen": "2026-04-12"
+    },
+    "person:Tate Cuffy": {
+      "type": "person",
+      "aliases": [
+        "Tate"
+      ],
+      "filename": "Tate-Cuffy.md",
+      "first_seen": "2026-04-12"
+    }
+  },
+  "alias_to_canonical": {
+    "david cochran": "person:David Cochran",
+    "dr. cochran": "person:David Cochran",
+    "cochran": "person:David Cochran",
+    "david": "person:David Cochran",
+    "robert norman": "person:Robert Norman",
+    "norman": "person:Robert Norman",
+    "newman university": "organization:Newman University",
+    "newman": "organization:Newman University",
+    "tiber solutions": "organization:Tiber Solutions",
+    "tiber": "organization:Tiber Solutions",
+    "data preprocessing": "course:Data Preprocessing",
+    "dsci-6423": "course:Data Preprocessing",
+    "data engineering": "course:Data Engineering",
+    "dsci-6313": "course:Data Engineering",
+    "data analysis and visualization": "course:Data Analysis and Visualization",
+    "data analysis": "course:Data Analysis and Visualization",
+    "dav": "course:Data Analysis and Visualization",
+    "data analytics seminar": "course:Data Analytics Seminar",
+    "analytics seminar": "course:Data Analytics Seminar",
+    "clawcode": "project:ClawCode",
+    "life agent": "project:Life Agent",
+    "life-agent": "project:Life Agent",
+    "gbrain": "project:GBrain",
+    "claude code": "tool:Claude Code",
+    "claude-code": "tool:Claude Code",
+    "claude cli": "tool:Claude Code",
+    "hermes agent": "tool:Hermes Agent",
+    "hermes": "tool:Hermes Agent",
+    "qmd": "tool:QMD",
+    "jennifer person": "person:Jennifer Person",
+    "jen": "person:Jennifer Person",
+    "jennifer": "person:Jennifer Person",
+    "ellie person": "person:Ellie Person",
+    "ellie": "person:Ellie Person",
+    "elizabeth": "person:Ellie Person",
+    "jason person": "person:Jason Person",
+    "jason": "person:Jason Person",
+    "kent haury": "person:Kent Haury",
+    "kent": "person:Kent Haury",
+    "garry tan": "person:Garry Tan",
+    "tan": "person:Garry Tan",
+    "tate cuffy": "person:Tate Cuffy",
+    "tate": "person:Tate Cuffy"
+  }
+}

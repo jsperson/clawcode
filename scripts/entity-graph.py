@@ -2,14 +2,16 @@
 """Entity Graph — extract entities from daily summaries and maintain Obsidian entity pages.
 
 Usage:
-    entity-graph.py                 # Process unprocessed summaries
+    entity-graph.py                 # Process unprocessed summaries + notes
     entity-graph.py --backfill N    # Process last N days regardless of state
-    entity-graph.py --seed          # Seed alias map from memory/topics/ files
+    entity-graph.py --seed          # Seed alias map from known entities
     entity-graph.py --dry-run       # Show what would be processed without writing
+    entity-graph.py --notes-only    # Process only personal handwritten notes
 
-Reads daily summary files (memory/YYYY-MM-DD-summary.md), extracts entities and
-relationships via Claude CLI, and creates/updates entity pages in the Obsidian vault
-at Entities/{type}/{name}.md.
+Reads daily summary files (memory/YYYY-MM-DD-summary.md) and processed handwritten
+notes (Personal Notes/Personal-Notes-*.md), extracts entities and relationships via
+Claude CLI, and creates/updates entity pages in the Obsidian vault at
+Entities/{type}/{name}.md.
 
 Entity pages use the Compiled Truth + Timeline format:
 - Compiled Truth: curated current-state summary (regenerated on updates)
@@ -39,6 +41,7 @@ from dotenv import load_dotenv
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 TZ = ZoneInfo("America/Chicago")
+DEFAULT_MODEL = "sonnet"  # Sonnet is plenty for structured extraction
 
 VAULT_PATH = Path.home() / "Library/Mobile Documents/iCloud~md~obsidian/Documents/scott"
 ENTITIES_DIR = VAULT_PATH / "Entities"
@@ -48,6 +51,8 @@ MEMORY_DIR = DEPLOYED_DIR / "memory"
 DATA_DIR = DEPLOYED_DIR / "data"
 STATE_PATH = DATA_DIR / "entity-graph-state.json"
 ALIASES_PATH = DATA_DIR / "entity-aliases.json"
+
+PERSONAL_NOTES_DIR = VAULT_PATH / "Personal Notes"
 
 ENTITY_TYPES = ["People", "Projects", "Courses", "Organizations", "Tools"]
 
@@ -123,6 +128,59 @@ def find_unprocessed(state: dict) -> list[tuple[str, Path]]:
 
 
 # ---------------------------------------------------------------------------
+# Personal notes discovery
+# ---------------------------------------------------------------------------
+
+
+def parse_personal_notes() -> list[tuple[str, str]]:
+    """Parse Personal-Notes-*.md files into (date_str, section_text) tuples.
+
+    Notes use ## YYYYMMDD headers. Returns dates in YYYY-MM-DD format for
+    consistency with summaries.
+    """
+    header_re = re.compile(r"^## (\d{4})(\d{2})(\d{2})\b", re.MULTILINE)
+    entries = []
+
+    for notes_file in sorted(PERSONAL_NOTES_DIR.glob("Personal-Notes-*.md")):
+        text = notes_file.read_text()
+        splits = list(header_re.finditer(text))
+        if not splits:
+            continue
+
+        for i, match in enumerate(splits):
+            year, month, day = match.group(1), match.group(2), match.group(3)
+            date_str = f"{year}-{month}-{day}"
+            start = match.start()
+            end = splits[i + 1].start() if i + 1 < len(splits) else len(text)
+            section = text[start:end].strip()
+            if section:
+                entries.append((date_str, section))
+
+    return sorted(entries, key=lambda x: x[0])
+
+
+def find_unprocessed_notes(state: dict) -> list[tuple[str, str]]:
+    """Find personal note sections needing processing.
+
+    Re-processes anything dated >= (latest processed note date - 1 day) to
+    catch partial notes that were scanned in later batches. Notes older than
+    that cutoff are skipped if already processed.
+    """
+    processed = state.get("processed_notes_dates", {})
+    all_notes = parse_personal_notes()
+
+    if processed:
+        latest = max(processed.keys())
+        # Subtract one day from the latest processed date
+        latest_dt = datetime.strptime(latest, "%Y-%m-%d")
+        cutoff = (latest_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+        return [(d, text) for d, text in all_notes
+                if d >= cutoff or d not in processed]
+    else:
+        return all_notes
+
+
+# ---------------------------------------------------------------------------
 # Claude CLI interaction
 # ---------------------------------------------------------------------------
 
@@ -146,6 +204,7 @@ def call_claude_json(prompt: str, config: dict) -> dict | list | None:
     cmd = [
         claude_path,
         "--print",
+        "--model", DEFAULT_MODEL,
         "--output-format", "json",
         "--dangerously-skip-permissions",
     ]
@@ -159,7 +218,7 @@ def call_claude_json(prompt: str, config: dict) -> dict | list | None:
         text=True,
         cwd=str(PROJECT_DIR),
         env=env,
-        timeout=120,
+        timeout=300,
     )
 
     if result.returncode != 0:
@@ -206,6 +265,7 @@ def call_claude_text(prompt: str, config: dict) -> str | None:
     cmd = [
         claude_path,
         "--print",
+        "--model", DEFAULT_MODEL,
         "--dangerously-skip-permissions",
     ]
 
@@ -218,7 +278,7 @@ def call_claude_text(prompt: str, config: dict) -> str | None:
         text=True,
         cwd=str(PROJECT_DIR),
         env=env,
-        timeout=120,
+        timeout=300,
     )
 
     if result.returncode != 0:
@@ -680,6 +740,57 @@ def process_summary(
     return updated
 
 
+def process_note_section(
+    date_str: str, section_text: str, aliases: dict, config: dict, dry_run: bool = False
+) -> list[str]:
+    """Process a single personal note section. Returns list of updated entity names."""
+    if not section_text.strip():
+        logger.info("Skipping empty note section for %s", date_str)
+        return []
+
+    logger.info("Extracting entities from note %s", date_str)
+    entities = extract_entities(date_str, section_text, aliases, config)
+    if not entities:
+        logger.info("No entities extracted from note %s", date_str)
+        return []
+
+    updated = []
+    for entity in entities:
+        name = entity.get("name", "").strip()
+        etype = entity.get("type", "").strip()
+        facts = entity.get("facts", [])
+        relationships = entity.get("relationships", [])
+        entity_aliases = entity.get("aliases", [])
+
+        if not name or not etype or etype not in ("person", "project", "course", "organization", "tool"):
+            continue
+
+        if not facts:
+            continue
+
+        canonical = resolve_entity(name, etype, entity_aliases, aliases)
+
+        rel_lines = []
+        for rel in relationships:
+            target = rel.get("target", "")
+            target_type = rel.get("target_type", "")
+            relation = rel.get("relation", "")
+            if target and target_type and relation:
+                rel_lines.append(build_relationship_line(target, target_type, relation))
+
+        if dry_run:
+            logger.info("  [DRY RUN] Would update %s/%s: %d facts, %d relationships",
+                        type_dir(etype), canonical, len(facts), len(rel_lines))
+            updated.append(canonical)
+            continue
+
+        path = write_entity_page(canonical, etype, facts, rel_lines, date_str, entity_aliases)
+        logger.info("  Updated: %s", path.relative_to(VAULT_PATH))
+        updated.append(canonical)
+
+    return updated
+
+
 def regenerate_all_truths(aliases: dict, config: dict) -> None:
     """Regenerate compiled truth for all entities that have timeline data."""
     entities = aliases.get("entities", {})
@@ -702,6 +813,7 @@ def main() -> None:
     parser.add_argument("--seed", action="store_true", help="Seed alias map from known entities")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be processed")
     parser.add_argument("--regenerate", action="store_true", help="Regenerate compiled truth for all entities")
+    parser.add_argument("--notes-only", action="store_true", help="Process only personal handwritten notes")
     args = parser.parse_args()
 
     load_dotenv(PROJECT_DIR / ".env")
@@ -728,32 +840,57 @@ def main() -> None:
 
     # Find summaries to process
     state = load_state()
-    if args.backfill:
-        summaries = find_summaries(args.backfill)
-        logger.info("Backfill mode: %d summaries from last %d days", len(summaries), args.backfill)
-    else:
-        summaries = find_unprocessed(state)
-        logger.info("Found %d unprocessed summaries", len(summaries))
-
-    if not summaries:
-        print("Nothing to process.")
-        return
-
-    # Process each summary
     total_updated = []
-    for date_str, summary_path in summaries:
+    summaries = []
+
+    # --- Process daily summaries (unless --notes-only) ---
+    if not args.notes_only:
+        if args.backfill:
+            summaries = find_summaries(args.backfill)
+            logger.info("Backfill mode: %d summaries from last %d days", len(summaries), args.backfill)
+        else:
+            summaries = find_unprocessed(state)
+            logger.info("Found %d unprocessed summaries", len(summaries))
+
+        for date_str, summary_path in summaries:
+            try:
+                updated = process_summary(date_str, summary_path, aliases, config, dry_run=args.dry_run)
+                total_updated.extend(updated)
+
+                if not args.dry_run:
+                    state["processed_dates"][date_str] = datetime.now(TZ).isoformat()
+                    save_state(state)
+                    save_aliases(aliases)
+
+            except Exception:
+                logger.exception("Failed to process summary %s", date_str)
+                continue
+
+    # --- Process personal handwritten notes ---
+    if args.backfill or args.notes_only:
+        notes = parse_personal_notes()
+        logger.info("Notes backfill: %d note sections found", len(notes))
+    else:
+        notes = find_unprocessed_notes(state)
+        logger.info("Found %d unprocessed note sections", len(notes))
+
+    for date_str, section_text in notes:
         try:
-            updated = process_summary(date_str, summary_path, aliases, config, dry_run=args.dry_run)
+            updated = process_note_section(date_str, section_text, aliases, config, dry_run=args.dry_run)
             total_updated.extend(updated)
 
             if not args.dry_run:
-                state["processed_dates"][date_str] = datetime.now(TZ).isoformat()
+                state.setdefault("processed_notes_dates", {})[date_str] = datetime.now(TZ).isoformat()
                 save_state(state)
                 save_aliases(aliases)
 
         except Exception:
-            logger.exception("Failed to process %s", date_str)
+            logger.exception("Failed to process note %s", date_str)
             continue
+
+    if not total_updated:
+        print("Nothing to process.")
+        return
 
     # Regenerate compiled truths for updated entities
     if total_updated and not args.dry_run:
@@ -768,7 +905,9 @@ def main() -> None:
                     break
 
     # Summary
-    print(f"Processed {len(summaries)} summaries, updated {len(total_updated)} entity pages")
+    summary_count = len(summaries) if not args.notes_only else 0
+    notes_count = len(notes)
+    print(f"Processed {summary_count} summaries + {notes_count} notes, updated {len(total_updated)} entity pages")
     if total_updated:
         unique = sorted(set(total_updated))
         print(f"Entities: {', '.join(unique)}")
