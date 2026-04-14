@@ -16,6 +16,11 @@ metadata:
 
 Query and manage Newman University Canvas LMS data via CLI. Supports 112 commands covering full CRUD operations.
 
+**IMPORTANT:** Always invoke via the project venv — bare `python3` uses system Python with broken SSL:
+```bash
+/Users/jsperson/clawcode/.venv/bin/python /Users/jsperson/clawcode/scripts/canvas-cli.py <command>
+```
+
 ## Setup
 
 1. Get API token from Canvas: Settings → Approved Integrations → New Access Token
@@ -25,9 +30,8 @@ Query and manage Newman University Canvas LMS data via CLI. Supports 112 command
 ## CLI Location
 
 ```bash
-/Users/jsperson/clawcode/scripts/canvas-cli.py
-# Or as a Python module:
-cd /Users/jsperson/clawcode/scripts && python3 -m canvas_cli
+# Always use the venv python:
+/Users/jsperson/clawcode/.venv/bin/python /Users/jsperson/clawcode/scripts/canvas-cli.py
 ```
 
 ## Output
