@@ -171,11 +171,10 @@ def find_unprocessed_notes(state: dict) -> list[tuple[str, str]]:
 
     if processed:
         latest = max(processed.keys())
-        # Subtract one day from the latest processed date
+        # Subtract one day from the latest processed date to catch partial batches
         latest_dt = datetime.strptime(latest, "%Y-%m-%d")
         cutoff = (latest_dt - timedelta(days=1)).strftime("%Y-%m-%d")
-        return [(d, text) for d, text in all_notes
-                if d >= cutoff or d not in processed]
+        return [(d, text) for d, text in all_notes if d >= cutoff]
     else:
         return all_notes
 
