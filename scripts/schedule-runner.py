@@ -146,17 +146,17 @@ def build_context() -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def invoke_script(script_cmd: str) -> str:
+def invoke_script(script_cmd: str, timeout: int = 300) -> str:
     """Run a shell script directly and return its stdout."""
     expanded = expand_path(script_cmd) if "~" in script_cmd else script_cmd
-    logger.info("Running script: %s", expanded)
+    logger.info("Running script: %s (timeout=%ds)", expanded, timeout)
 
     result = subprocess.run(
         ["bash", "-c", expanded],
         capture_output=True,
         text=True,
         cwd=str(PROJECT_DIR),
-        timeout=300,
+        timeout=timeout,
     )
 
     if result.returncode != 0:
@@ -305,7 +305,8 @@ def main() -> None:
 
     try:
         if has_script:
-            response = invoke_script(task["script"])
+            task_timeout = task.get("timeout", 300)
+            response = invoke_script(task["script"], timeout=task_timeout)
         else:
             response = invoke_claude(task["prompt"], config)
 
