@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# ical-query.sh — Run ical CLI via launchd one-shot to bypass TCC restrictions.
+# ical-query.sh — Direct passthrough to the ical CLI with default excludes
+# and timezone conversion for JSON output.
 #
-# When ical is invoked from a Python process chain (Claude Code, bot, etc.),
-# macOS TCC denies Calendar access via EventKit. This wrapper spawns ical
-# through launchd (launchd → bash → ical) so there's no Python ancestor
-# in the process chain, and Calendar access is granted.
+# Historical note: this script used to spawn ical through a launchd one-shot
+# to bypass TCC restrictions when invoked from a Python process chain. As of
+# 2026-04-11, macOS TCC grants Calendar access directly to the Claude Code
+# process chain, so the launchd detour is no longer needed — and the wrapper
+# started failing with exit code 5. Simplified to a direct call.
 #
 # Usage: ical-query.sh [ical arguments...]
 #
@@ -34,68 +36,28 @@ ICAL_BIN="$(command -v ical 2>/dev/null || echo "$HOME/.local/bin/ical")"
 # Always exclude Siri Suggestions calendar (phantom events from iMessage parsing)
 DEFAULT_EXCLUDES=(--exclude-calendar "Found in Natural Language")
 
-# Build the ical command string with proper quoting
-ICAL_CMD="$ICAL_BIN"
-for arg in "${DEFAULT_EXCLUDES[@]}"; do
-    ICAL_CMD="$ICAL_CMD $(printf '%q' "$arg")"
-done
+# Detect JSON output mode up-front so we know whether to post-process
+WANT_JSON=0
 for arg in "$@"; do
-    ICAL_CMD="$ICAL_CMD $(printf '%q' "$arg")"
+    case "$arg" in
+        json|-o=json|--output=json) WANT_JSON=1 ;;
+    esac
+done
+# Also catch "-o json" / "--output json" as two separate tokens
+prev=""
+for arg in "$@"; do
+    if [ "$prev" = "-o" ] || [ "$prev" = "--output" ]; then
+        [ "$arg" = "json" ] && WANT_JSON=1
+    fi
+    prev="$arg"
 done
 
-ICAL_TMPDIR=$(mktemp -d /tmp/clawcode-ical-XXXXXXXX)
-ICAL_OUT="$ICAL_TMPDIR/out"
-ICAL_ERR="$ICAL_TMPDIR/err"
-ICAL_RC="$ICAL_TMPDIR/rc"
-ICAL_PLIST="$ICAL_TMPDIR/plist"
-ICAL_LABEL="com.clawcode.ical.$$"
-
-cleanup() {
-    launchctl bootout "gui/$(id -u)/$ICAL_LABEL" 2>/dev/null || true
-    rm -rf "$ICAL_TMPDIR"
-}
-trap cleanup EXIT
-
-cat > "$ICAL_PLIST" << PLISTEOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>$ICAL_LABEL</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>-c</string>
-        <string>$ICAL_CMD > $ICAL_OUT 2> $ICAL_ERR; echo \$? > $ICAL_RC</string>
-    </array>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-</dict>
-</plist>
-PLISTEOF
-
-launchctl bootstrap "gui/$(id -u)" "$ICAL_PLIST" 2>/dev/null
-
-# Wait for the job to finish (ical typically runs in <1s)
-for i in $(seq 1 40); do
-    launchctl print "gui/$(id -u)/$ICAL_LABEL" >/dev/null 2>&1 || break
-    sleep 0.25
-done
-
-# Output results
-if [ -s "$ICAL_OUT" ]; then
-    # If JSON output, convert UTC timestamps to local time (America/Chicago)
-    # so LLMs don't have to do timezone math (DST-prone)
-    if echo "$ICAL_CMD" | grep -q -- '-o json\|--output json'; then
-        python3 -c "
+if [ "$WANT_JSON" -eq 1 ]; then
+    # Convert UTC timestamps to local time (America/Chicago) so LLMs don't
+    # have to do timezone math (DST-prone).
+    "$ICAL_BIN" "${DEFAULT_EXCLUDES[@]}" "$@" | python3 -c "
 import json, sys
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 tz = ZoneInfo('America/Chicago')
@@ -109,17 +71,8 @@ for item in items:
             item[key] = dt.astimezone(tz).isoformat()
 json.dump(data, sys.stdout, indent=2)
 print()
-" < "$ICAL_OUT" 2>/dev/null || cat "$ICAL_OUT"
-    else
-        cat "$ICAL_OUT"
-    fi
-fi
-
-if [ -s "$ICAL_ERR" ]; then
-    cat "$ICAL_ERR" >&2
-fi
-
-# Return ical's exit code
-if [ -s "$ICAL_RC" ]; then
-    exit "$(cat "$ICAL_RC")"
+"
+    exit "${PIPESTATUS[0]}"
+else
+    exec "$ICAL_BIN" "${DEFAULT_EXCLUDES[@]}" "$@"
 fi
