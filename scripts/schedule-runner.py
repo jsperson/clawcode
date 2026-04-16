@@ -27,10 +27,10 @@ sys.path.insert(0, str(PROJECT_DIR))
 
 import yaml  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
+from bot.config import load_raw_config as _load_raw_config, load_schedules as _load_schedules  # noqa: E402
+from bot.utils import split_message  # noqa: E402
 
 TZ = ZoneInfo("America/Chicago")
-MAX_DISCORD_LEN = 2000
-SAFE_LEN = 1900
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,54 +50,8 @@ def load_env() -> None:
     load_dotenv(PROJECT_DIR / ".env")
 
 
-def load_schedules() -> dict:
-    """Load schedule definitions from config/schedules.yaml."""
-    path = PROJECT_DIR / "config" / "schedules.yaml"
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    return data.get("schedules", {})
-
-
-def load_config() -> dict:
-    """Load main config values we need."""
-    path = PROJECT_DIR / "config" / "config.yaml"
-    with open(path) as f:
-        return yaml.safe_load(f)
-
-
 def expand_path(p: str) -> str:
     return str(Path(p).expanduser())
-
-
-def split_message(text: str) -> list[str]:
-    """Split for Discord's 2000-char limit."""
-    if len(text) <= MAX_DISCORD_LEN:
-        return [text]
-
-    chunks: list[str] = []
-    remaining = text
-
-    while remaining:
-        if len(remaining) <= SAFE_LEN:
-            chunks.append(remaining)
-            break
-
-        cut = remaining.rfind("\n\n", 0, SAFE_LEN)
-        if cut > 0:
-            chunks.append(remaining[:cut])
-            remaining = remaining[cut:].lstrip("\n")
-            continue
-
-        cut = remaining.rfind("\n", 0, SAFE_LEN)
-        if cut > 0:
-            chunks.append(remaining[:cut])
-            remaining = remaining[cut:].lstrip("\n")
-            continue
-
-        chunks.append(remaining[:SAFE_LEN])
-        remaining = remaining[SAFE_LEN:]
-
-    return [c for c in chunks if c.strip()]
 
 
 def update_state(task_name: str) -> None:
@@ -278,7 +232,7 @@ def main() -> None:
     load_env()
 
     # Load schedules
-    schedules = load_schedules()
+    schedules = _load_schedules()
     if task_name not in schedules:
         logger.error("Unknown task: %s", task_name)
         sys.exit(1)
@@ -295,7 +249,7 @@ def main() -> None:
         logger.error("Task %s has neither 'script' nor 'prompt'", task_name)
         sys.exit(1)
 
-    config = load_config()
+    config = _load_raw_config()
 
     # Get Discord credentials
     bot_token = os.environ.get("DISCORD_TOKEN")

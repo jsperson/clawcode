@@ -269,3 +269,21 @@ class Config:
             gateway=gateway,
             heartbeat=heartbeat,
         )
+
+
+_PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+
+def load_raw_config(project_dir: Path | None = None) -> dict:
+    """Load config/config.yaml as a raw dict. Useful for scripts."""
+    path = (project_dir or _PROJECT_DIR) / "config" / "config.yaml"
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+def load_schedules(project_dir: Path | None = None) -> dict:
+    """Load config/schedules.yaml as a raw dict. Useful for scripts."""
+    path = (project_dir or _PROJECT_DIR) / "config" / "schedules.yaml"
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    return data.get("schedules", {})

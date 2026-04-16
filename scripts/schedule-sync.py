@@ -21,6 +21,10 @@ from pathlib import Path
 import yaml
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_DIR))
+
+from bot.config import load_schedules  # noqa: E402
+
 LAUNCH_AGENTS_DIR = Path.home() / "Library" / "LaunchAgents"
 LABEL_PREFIX = "com.clawcode.schedule."
 
@@ -196,13 +200,6 @@ def generate_plist(name: str, cron_expr: str) -> dict:
 
     return plist
 
-
-def load_schedules() -> dict:
-    """Load schedule definitions from config/schedules.yaml."""
-    path = PROJECT_DIR / "config" / "schedules.yaml"
-    with open(path) as f:
-        data = yaml.safe_load(f)
-    return data.get("schedules", {})
 
 
 def main() -> None:

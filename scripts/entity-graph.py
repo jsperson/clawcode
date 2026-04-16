@@ -40,6 +40,10 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 
 PROJECT_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_DIR))
+
+from bot.config import load_raw_config  # noqa: E402
+
 TZ = ZoneInfo("America/Chicago")
 DEFAULT_MODEL = "sonnet"  # Sonnet is plenty for structured extraction
 
@@ -183,11 +187,6 @@ def find_unprocessed_notes(state: dict) -> list[tuple[str, str]]:
 # Claude CLI interaction
 # ---------------------------------------------------------------------------
 
-
-def load_config() -> dict:
-    path = PROJECT_DIR / "config" / "config.yaml"
-    with open(path) as f:
-        return yaml.safe_load(f)
 
 
 def get_claude_path(config: dict) -> str:
@@ -816,7 +815,7 @@ def main() -> None:
     args = parser.parse_args()
 
     load_dotenv(PROJECT_DIR / ".env")
-    config = load_config()
+    config = load_raw_config()
 
     # Seed aliases if requested
     if args.seed:
