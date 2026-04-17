@@ -62,3 +62,9 @@ The heartbeat prompt is injected into a Claude session that reads HEARTBEAT.md a
 - `scripts/ical-query.sh` — launchd one-shot wrapper for TCC bypass (replaced icalpal-query.sh)
 - `skills/calendar-ical/SKILL.md` — ical CLI skill (documents wrapper requirement)
 - The same TCC pattern applies to the `ical` CLI (EventKit-based) — Calendar permission is attributed to the parent process, so launchd wrapping is still required from Python contexts
+
+## Regression log
+
+- **2026-04-10 → 2026-04-16:** The launchd bypass appeared to be "failing with exit code 5." Observation that `ical` worked when called directly led to the incorrect conclusion that macOS had granted Calendar access to the Claude Code process chain, and the bypass was removed (commit 618bf78).
+- **2026-04-16 (actual root cause):** macOS Sequoia (26+) rejects `launchctl bootstrap` for plists stored in `/tmp` with "Input/output error" (exit 5). The bypass was fine; the plist location was the problem. Fix: write plists to `~/Library/LaunchAgents/` and clean up after. The "ical works directly" test succeeded only because it was run from an interactive Terminal session — the bot's Node/Python chain still failed hard with "Calendar access denied."
+- **Lesson:** Before removing a TCC workaround, verify from the *actual consuming context* (bot process chain), not from an interactive terminal. The responsible-process TCC model means interactive tests are unreliable proxies for headless tests.
