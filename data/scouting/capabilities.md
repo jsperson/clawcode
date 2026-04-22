@@ -15,7 +15,7 @@ This file helps the scouting agent understand what ClawCode already does, so it 
 ## Scheduled Tasks
 
 - **life_overnight** (daily 02:00) — Life Agent generates daily plan from calendar, reminders, weather, Canvas, principles
-- **daily_scout** (daily 04:00) — Capability scouting (this system)
+- **weekly_scout** (Sunday 04:00) — Capability scouting (this system)
 - **daily_summary** (daily 06:30) — Summarize yesterday's conversation logs
 - **daily_backup** (daily 01:00) — rsync to iCloud Drive
 - **weekly_trends** (Monday 03:00) — Macro trends research across 6 domains, written to Obsidian
