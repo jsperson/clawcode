@@ -52,3 +52,4 @@ bin/
 # IDE
 .vscode/
 .idea/
+docs/audits/*.json

@@ -321,7 +321,12 @@ RULES:
 - Skip Scott Person — he's the author, not an entity to track
 - Skip generic mentions ("the professor" without a name)
 - Match existing entities by name/alias before creating new ones
-- Keep facts specific to what was learned THIS day
+- If a name matches a KNOWN ENTITY canonical or alias (even with different
+  capitalization or spelling — "Marshall" vs "Marshal", "clawcode" vs
+  "ClawCode"), USE THE CANONICAL exactly as listed. Do not invent a new
+  entity for a near-match spelling.
+- Keep facts specific to what was learned THIS day. Do not restate facts
+  that are likely already captured — aim for NEW information only.
 - Relationships should be between two named entities
 - If no entities are found, return {{"entities": []}}
 
@@ -659,9 +664,11 @@ def seed_aliases() -> dict:
         ("ClawCode", "project", ["Clawcode", "clawcode"]),
         ("Life Agent", "project", ["life-agent", "Life-Agent"]),
         ("GBrain", "project", ["gbrain"]),
+        ("Marshal", "project", ["Marshall"]),
         ("Claude Code", "tool", ["claude-code", "Claude CLI"]),
         ("Hermes Agent", "tool", ["Hermes", "hermes"]),
         ("QMD", "tool", ["qmd"]),
+        ("Apple Shortcuts", "tool", ["Apple Shortcuts MCP", "Apple Shortcuts MCP server", "Shortcuts"]),
         ("Jennifer Person", "person", ["Jen", "Jennifer"]),
         ("Ellie Person", "person", ["Ellie", "Elizabeth"]),
         ("Jason Person", "person", ["Jason"]),
