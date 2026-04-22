@@ -1,0 +1,857 @@
+{
+  "generated": "2026-04-22T13:20:35-05:00",
+  "query_count": 18,
+  "modes": [
+    "search",
+    "vsearch",
+    "query"
+  ],
+  "top_n": 5,
+  "results": [
+    {
+      "id": "entity_david_cochran",
+      "query": "David Cochran Dean Newman University",
+      "category": "entity",
+      "expected_any": [
+        "entities/people/david-cochran"
+      ],
+      "modes": {
+        "search": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "entities/people/david-cochran",
+          "top_paths": [
+            "vault-main/entities/people/david-cochran.md",
+            "vault-main/entities/organizations/newman-university.md",
+            "vault-main/entities/projects/marshal.md",
+            "daily-logs/topics/school.md",
+            "vault-main/archive/education/newman/march-5-2026-meetup-talk-be-your-own-data-engineer/march-5-meetup-talk.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 2,
+          "matched_on": "entities/people/david-cochran",
+          "top_paths": [
+            "daily-logs/2026-04-12-cli.md",
+            "vault-main/entities/people/david-cochran.md",
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-02-17-cli.md",
+            "vault-main/entities/organizations/newman-university.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-12-cli.md",
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-04-08-cli.md",
+            "vault-main/entities/projects/marshal.md",
+            "daily-logs/topics/school.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "entity_john_mcelligott",
+      "query": "John McElligott Sentium AI PBS robots",
+      "category": "entity",
+      "expected_any": [
+        "entities/people/john-mcelligott"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-21-discord.md",
+            "vault-main/personal-notes/personal-notes-2026.md",
+            "daily-logs/2026-04-21-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault-main/archive/ai-use/ai-agentic-manual.md",
+            "vault/archive/knowledge/working/mark-esposito.md",
+            "vault-main/archive/knowledge/working/mark-esposito.md",
+            "vault-main/entities/tools/elephant-robotics-mycobot.md",
+            "daily-logs/2026-04-15-cli.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-21-cli.md",
+            "vault/projects/ai-use/ai-agentic-manual.md",
+            "daily-logs/2026-04-21-discord.md",
+            "vault-main/personal-notes/personal-notes-2026.md",
+            "vault-main/archive/evernote/pages-1001-1053/exploratory-data-analysis-notes-week-1.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "entity_marshal_project",
+      "query": "Marshal shared multi-agent knowledge workspace",
+      "category": "entity",
+      "expected_any": [
+        "projects/marshal",
+        "entities/projects/marshal"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": []
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 4,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "daily-logs/2026-04-08-cli.md",
+            "daily-logs/2026-04-15-cli.md",
+            "daily-logs/2026-04-12-summary.md",
+            "vault-main/projects/marshal/readme.md",
+            "vault-main/entities/projects/marshal.md"
+          ]
+        },
+        "query": {
+          "hit": true,
+          "rank": 2,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "daily-logs/2026-04-08-cli.md",
+            "vault-main/projects/marshal/davids-original-requirements.md",
+            "vault-main/entities/projects/marshal.md",
+            "vault-main/entities/projects/marshall.md",
+            "daily-logs/2026-04-15-cli.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "entity_gbrain",
+      "query": "GBrain Garry Tan personal AI knowledge system",
+      "category": "entity",
+      "expected_any": [
+        "entities/projects/gbrain",
+        "ideas/hermes"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault-main/entities/people/garry-tan.md",
+            "daily-logs/2026-04-12-discord.md",
+            "daily-logs/2026-04-16-discord.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-12-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 2,
+          "matched_on": "entities/projects/gbrain",
+          "top_paths": [
+            "vault-main/entities/people/garry-tan.md",
+            "vault-main/entities/projects/gbrain.md",
+            "daily-logs/2026-04-16-cli.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-12-discord.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault-main/entities/people/garry-tan.md",
+            "daily-logs/2026-04-12-cli.md",
+            "daily-logs/2026-04-15-cli.md",
+            "daily-logs/2026-04-20-cli.md",
+            "vault-main/projects/marshal/readme.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "project_marshal_status",
+      "query": "Marshal SharePoint OneDrive platform decision",
+      "category": "project",
+      "expected_any": [
+        "projects/marshal"
+      ],
+      "modes": {
+        "search": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "vault-main/projects/marshal/readme.md",
+            "vault-main/projects/marshal/platform-comparison.md",
+            "daily-logs/2026-04-14-cli.md",
+            "vault-main/personal-notes/personal-notes-2026.md",
+            "daily-logs/2026-04-16-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 2,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "vault-main/entities/tools/onedrive.md",
+            "vault-main/entities/projects/marshal.md",
+            "daily-logs/2026-04-16-cli.md",
+            "vault-main/projects/marshal/readme.md",
+            "vault-main/projects/marshal/platform-comparison.md"
+          ]
+        },
+        "query": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "vault-main/projects/marshal/readme.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-12-cli.md",
+            "vault-main/projects/marshal/platform-comparison.md",
+            "vault-main/entities/tools/onedrive.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "project_dockerclawcode",
+      "query": "DockerClawCode containerized Claude sessions",
+      "category": "project",
+      "expected_any": [
+        "dockerclawcode",
+        "docker-clawcode"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-02-28-cli.md",
+            "daily-logs/2026-03-28-cli.md",
+            "daily-logs/2026-03-08-cli.md",
+            "daily-logs/2026-03-20-cli.md",
+            "daily-logs/2026-03-14-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "dockerclawcode",
+          "top_paths": [
+            "vault/projects/dockerclawcode/readme.md",
+            "vault-main/archive/dockerclawcode/readme.md",
+            "daily-logs/2026-02-21-discord.md",
+            "vault/archive/education/education-springboard-data-engineering/notes.md",
+            "vault-main/archive/education/education-springboard-data-engineering/notes.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-02-28-cli.md",
+            "daily-logs/2026-02-21-discord.md",
+            "daily-logs/2026-03-26-cli.md",
+            "daily-logs/2026-03-14-cli.md",
+            "daily-logs/2026-03-07-cli.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "project_hermes_research",
+      "query": "Hermes hybrid cost research Ollama local",
+      "category": "project",
+      "expected_any": [
+        "hermes"
+      ],
+      "modes": {
+        "search": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "hermes",
+          "top_paths": [
+            "vault-main/ideas/hermes-hybrid-cost-research.md",
+            "daily-logs/2026-04-19-cli.md",
+            "daily-logs/2026-04-11-cli.md",
+            "daily-logs/2026-04-17-cli.md",
+            "daily-logs/2026-04-21-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 5,
+          "matched_on": "hermes",
+          "top_paths": [
+            "daily-logs/2026-04-11-cli.md",
+            "daily-logs/2026-04-15-cli.md",
+            "daily-logs/2026-04-12-cli.md",
+            "daily-logs/2026-04-13-cli.md",
+            "vault-main/entities/tools/hermes-agent.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-19-cli.md",
+            "daily-logs/2026-04-17-cli.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-16-discord.md",
+            "daily-logs/2026-04-14-cli.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "decision_gbrain_multiuser",
+      "query": "GBrain multi-user verification single user",
+      "category": "decision",
+      "expected_any": [
+        "2026-04-22",
+        "marshal",
+        "gbrain"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": []
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "gbrain",
+          "top_paths": [
+            "vault-main/entities/projects/gbrain.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-16-cli.md",
+            "vault-main/entities/people/garry-tan.md",
+            "vault/projects/newman-dataengineering/fundamentals-of-data-engineering-chapter-3.md"
+          ]
+        },
+        "query": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "gbrain",
+          "top_paths": [
+            "vault-main/entities/projects/gbrain.md",
+            "vault-main/archive/ai-prompt-championship/repo-mirror/prompts/05d-dashboard.md",
+            "daily-logs/2026-04-16-cli.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-18-cli.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "decision_organization_strategy",
+      "query": "organization strategy scheduled jobs cleanup",
+      "category": "decision",
+      "expected_any": [
+        "2026-04-22",
+        "organization-strategy"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-16-cli.md",
+            "daily-logs/2026-04-20-cli.md",
+            "daily-logs/2026-04-12-cli.md",
+            "vault-main/entities/projects/clawcode.md",
+            "daily-logs/2026-04-15-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-03-09-cli.md",
+            "daily-logs/2026-04-08-cli.md",
+            "vault/archive/geek-stuff/general/data-lake-table-creation.md",
+            "vault-main/archive/geek-stuff/general/data-lake-table-creation.md",
+            "daily-logs/2026-02-12-discord.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-20-cli.md",
+            "daily-logs/2026-03-09-cli.md",
+            "vault-main/archive/work/fdic/schedule-ssas-administrative-tasks-with-sql-server-agent.md",
+            "daily-logs/2026-04-21-discord.md",
+            "daily-logs/2026-04-16-cli.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "xref_david_marshal",
+      "query": "what did David and I discuss about Marshal",
+      "category": "cross_ref",
+      "expected_any": [
+        "david-cochran",
+        "projects/marshal"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-04-12-cli.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-16-cli.md",
+            "daily-logs/2026-04-15-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "vault-main/projects/marshal/davids-original-requirements.md",
+            "vault-main/entities/projects/marshall.md",
+            "daily-logs/2026-04-12-cli.md",
+            "vault-main/entities/projects/marshal.md",
+            "daily-logs/2026-04-20-cli.md"
+          ]
+        },
+        "query": {
+          "hit": true,
+          "rank": 3,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-14-cli.md",
+            "vault-main/projects/marshal/readme.md",
+            "vault-main/entities/people/david-cochran.md",
+            "vault-main/projects/marshal/platform-comparison.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "xref_scott_newman",
+      "query": "Scott Newman University MS Data Science",
+      "category": "cross_ref",
+      "expected_any": [
+        "newman",
+        "user.md"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/topics/school.md",
+            "vault/archive/knowledge/working/20250716-david-cochran-and-friends.md",
+            "vault-main/archive/knowledge/working/20250716-david-cochran-and-friends.md",
+            "workspace/skills/scott-vault/skill.md",
+            "workspace-main/skills/scott-vault/skill.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 3,
+          "matched_on": "newman",
+          "top_paths": [
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-02-17-cli.md",
+            "vault-main/entities/organizations/newman-university.md",
+            "memory-root/memory.md",
+            "memory-alt/memory.md"
+          ]
+        },
+        "query": {
+          "hit": true,
+          "rank": 3,
+          "matched_on": "user.md",
+          "top_paths": [
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-02-12-discord.md",
+            "workspace-main/user.md",
+            "memory-alt-main/memory.md",
+            "workspace-main/skills/scott-vault/skill.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "alias_marshall_typo",
+      "query": "Marshall project David working group",
+      "category": "alias",
+      "expected_any": [
+        "projects/marshal",
+        "entities/projects/marshal"
+      ],
+      "modes": {
+        "search": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "vault-main/projects/marshal/davids-original-requirements.md",
+            "vault-main/projects/marshal/readme.md",
+            "daily-logs/2026-04-13-cli.md",
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-04-21-discord.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "vault-main/projects/marshal/davids-original-requirements.md",
+            "vault-main/projects/marshal/readme.md",
+            "vault/archive/work/ipipeline/ipipeline/ods-project-summary-for-david.md",
+            "vault-main/archive/work/ipipeline/ipipeline/ods-project-summary-for-david.md",
+            "daily-logs/2026-04-08-cli.md"
+          ]
+        },
+        "query": {
+          "hit": true,
+          "rank": 4,
+          "matched_on": "projects/marshal",
+          "top_paths": [
+            "daily-logs/2026-04-12-cli.md",
+            "daily-logs/2026-04-13-cli.md",
+            "vault-main/entities/people/david-cochran.md",
+            "vault-main/entities/projects/marshall.md",
+            "vault-main/projects/marshal/davids-original-requirements.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "skill_weekly_signal_diff",
+      "query": "weekly signal diff macro structural changes",
+      "category": "skill",
+      "expected_any": [
+        "weekly-signal-diff",
+        "skills/weekly-signal-diff"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-14-summary.md",
+            "vault-main/trends/2026-w12.md",
+            "vault-main/trends/2026-w10.md",
+            "vault-main/trends/2026-w14.md",
+            "vault-main/trends/2026-w11.md"
+          ]
+        },
+        "vsearch": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-14-cli.md",
+            "vault/trends/readme.md",
+            "vault-main/trends/readme.md",
+            "daily-logs/2026-03-23-cli.md",
+            "daily-logs/2026-02-23-cli.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-04-14-summary.md",
+            "vault-main/trends/readme.md",
+            "sessions/5c9cfbf2-a1ee-446b-8e24-df532abbed79.md",
+            "vault-main/entities/projects/clawcode.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "skill_canvas",
+      "query": "Canvas LMS assignments grades Newman",
+      "category": "skill",
+      "expected_any": [
+        "skills/canvas"
+      ],
+      "modes": {
+        "search": {
+          "hit": true,
+          "rank": 1,
+          "matched_on": "skills/canvas",
+          "top_paths": [
+            "workspace/skills/canvas/skill.md",
+            "workspace-main/skills/canvas/skill.md",
+            "workspace/tools.md",
+            "workspace-main/tools.md",
+            "daily-logs/2026-02-12-discord.md"
+          ]
+        },
+        "vsearch": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault/archive/education/newman/intro-email-with-account-information.md",
+            "vault-main/archive/education/newman/intro-email-with-account-information.md",
+            "daily-logs/2026-02-26-cli.md",
+            "daily-logs/2026-02-17-cli.md",
+            "sessions/99114ebd-920d-4d55-b656-c7a26581408f.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-02-26-cli.md",
+            "sessions/51b4f9a6-3ecb-4e32-bc42-2feb4f8eda2f.md",
+            "sessions/99114ebd-920d-4d55-b656-c7a26581408f.md",
+            "workspace-main/tools.md",
+            "daily-logs/2026-02-12-discord.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "memory_browser_feedback",
+      "query": "browser automation tools which to use",
+      "category": "memory",
+      "expected_any": [
+        "feedback_browser",
+        "browser"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault-main/entities/tools/rodney.md",
+            "daily-logs/2026-03-10-summary.md",
+            "vault-main/entities/tools/udemy.md",
+            "sessions/c9311339-64ad-49ff-bbc2-1f4f3f1b7da6.md",
+            "daily-logs/2026-03-10-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": true,
+          "rank": 3,
+          "matched_on": "browser",
+          "top_paths": [
+            "sessions/c9311339-64ad-49ff-bbc2-1f4f3f1b7da6.md",
+            "daily-logs/2026-03-11-cli.md",
+            "vault-main/archive/browser-automation/status.md",
+            "daily-logs/2026-03-10-cli.md",
+            "daily-logs/2026-02-25-discord.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-03-10-cli.md",
+            "vault-main/entities/tools/rodney.md",
+            "vault-main/entities/tools/playwright-mcp.md",
+            "vault-main/entities/people/simon-willison.md",
+            "daily-logs/2026-02-25-discord.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "memory_python_venv",
+      "query": "Python venv pip install",
+      "category": "memory",
+      "expected_any": [
+        "feedback_python_venv",
+        "memory"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault-main/archive/ai-prompt-championship/archive/pre-competition/planning/progress.md",
+            "vault-main/archive/ai-prompt-championship/repo-mirror/docs/plans/2026-04-15-001-feat-meta-deliverable-prompts-and-dashboard-plan.md",
+            "vault-main/archive/ai-prompt-championship/repo-mirror/docs/brainstorms/2026-04-15-meta-deliverable-prompts-requirements.md",
+            "daily-logs/2026-04-14-summary.md",
+            "vault-main/archive/ai-prompt-championship/archive/pre-competition/planning/2026-04-08-001-feat-oracle-track-framework-plan.md"
+          ]
+        },
+        "vsearch": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault/archive/geek-stuff/python/to-use-pip-on-python3-sudo-python3-m-pip-install-bs4-this-installs-beautiful-soup-for-pyton3.md",
+            "vault-main/archive/geek-stuff/python/to-use-pip-on-python3-sudo-python3-m-pip-install-bs4-this-installs-beautiful-soup-for-pyton3.md",
+            "vault/archive/geek-stuff/rvr/setting-up-rasberry-pi.md",
+            "vault-main/archive/geek-stuff/rvr/setting-up-rasberry-pi.md",
+            "daily-logs/2026-04-14-cli.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-16-cli.md",
+            "vault-main/archive/geek-stuff/python/to-use-pip-on-python3-sudo-python3-m-pip-install-bs4-this-installs-beautiful-soup-for-pyton3.md",
+            "daily-logs/2026-04-14-cli.md",
+            "vault-main/archive/geek-stuff/rvr/setting-up-rasberry-pi.md",
+            "vault-main/archive/education/newman/newman-dataengineering/fundamentals-of-data-engineering-chapter-3.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "infra_entity_graph",
+      "query": "entity graph daily timeline extraction",
+      "category": "infra",
+      "expected_any": [
+        "entity-graph",
+        "schedules"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-12-summary.md",
+            "vault/working/ai-assistant-memory.md",
+            "daily-logs/2026-04-15-discord.md",
+            "daily-logs/2026-04-20-cli.md",
+            "daily-logs/2026-04-16-cli.md"
+          ]
+        },
+        "vsearch": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault-main/life-agent/plans/daily/2026-03-30.md",
+            "daily-logs/2026-04-12-cli.md",
+            "vault/working/ai-assistant-memory.md",
+            "daily-logs/2026-04-13-cli.md",
+            "vault/projects/ati/time-tracking.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "daily-logs/2026-04-12-cli.md",
+            "vault/working/ai-assistant-memory.md",
+            "daily-logs/2026-04-16-cli.md",
+            "daily-logs/2026-04-14-cli.md",
+            "daily-logs/2026-04-21-cli.md"
+          ]
+        }
+      }
+    },
+    {
+      "id": "infra_scheduler",
+      "query": "how to schedule a task launchd cron",
+      "category": "infra",
+      "expected_any": [
+        "skills/scheduler",
+        "schedules.yaml"
+      ],
+      "modes": {
+        "search": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "vault/projects/life-agent/scheduler-dependency.md",
+            "vault-main/projects/life-agent/scheduler-dependency.md",
+            "sessions/4020d485-a787-42e8-9f89-936da0c9abae.md",
+            "vault/projects/life-agent/platform-agnosticism.md",
+            "vault-main/projects/life-agent/platform-agnosticism.md"
+          ]
+        },
+        "vsearch": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "sessions/4020d485-a787-42e8-9f89-936da0c9abae.md",
+            "vault/projects/life-agent/scheduler-dependency.md",
+            "vault-main/projects/life-agent/scheduler-dependency.md",
+            "sessions/756b1041-ae91-4d49-92c6-560f13d94303.md",
+            "daily-logs/2026-04-20-cli.md"
+          ]
+        },
+        "query": {
+          "hit": false,
+          "rank": null,
+          "matched_on": null,
+          "top_paths": [
+            "sessions/4020d485-a787-42e8-9f89-936da0c9abae.md",
+            "daily-logs/topics/infrastructure.md",
+            "vault-main/projects/life-agent/scheduler-dependency.md",
+            "daily-logs/2026-04-20-cli.md",
+            "daily-logs/2026-03-05-discord.md"
+          ]
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "search": {
+      "hits": 5,
+      "total": 18,
+      "precision_at_5": 0.278
+    },
+    "vsearch": {
+      "hits": 11,
+      "total": 18,
+      "precision_at_5": 0.611
+    },
+    "query": {
+      "hits": 6,
+      "total": 18,
+      "precision_at_5": 0.333
+    }
+  }
+}

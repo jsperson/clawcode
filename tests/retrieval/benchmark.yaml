@@ -1,0 +1,142 @@
+# Retrieval benchmark — curated queries with expected hits.
+#
+# Each query should find at least one of the expected paths in the top-N results.
+# Expected paths use substring matching against the full qmd:// URI.
+#
+# When adding queries, pick ones that test:
+#   - Entity recall (canonical entity pages)
+#   - Project retrieval (current project docs)
+#   - Conversation recall (decisions in daily logs)
+#   - Cross-reference (A-references-B relationships)
+#   - Alias/typo resolution (near-duplicates, capitalization)
+
+queries:
+  # --- Entity recall ---
+  - id: entity_david_cochran
+    query: "David Cochran Dean Newman University"
+    expected_any:
+      - "entities/people/david-cochran"
+    category: entity
+
+  - id: entity_john_mcelligott
+    query: "John McElligott Sentium AI PBS robots"
+    expected_any:
+      - "entities/people/john-mcelligott"
+    category: entity
+
+  - id: entity_marshal_project
+    query: "Marshal shared multi-agent knowledge workspace"
+    expected_any:
+      - "projects/marshal"
+      - "entities/projects/marshal"
+    category: entity
+
+  - id: entity_gbrain
+    query: "GBrain Garry Tan personal AI knowledge system"
+    expected_any:
+      - "entities/projects/gbrain"
+      - "ideas/hermes"
+    category: entity
+
+  # --- Project retrieval ---
+  - id: project_marshal_status
+    query: "Marshal SharePoint OneDrive platform decision"
+    expected_any:
+      - "projects/marshal"
+    category: project
+
+  - id: project_dockerclawcode
+    query: "DockerClawCode containerized Claude sessions"
+    expected_any:
+      - "dockerclawcode"
+      - "docker-clawcode"
+    category: project
+
+  - id: project_hermes_research
+    query: "Hermes hybrid cost research Ollama local"
+    expected_any:
+      - "hermes"
+    category: project
+
+  # --- Conversation recall ---
+  - id: decision_gbrain_multiuser
+    query: "GBrain multi-user verification single user"
+    expected_any:
+      - "2026-04-22"
+      - "marshal"
+      - "gbrain"
+    category: decision
+
+  - id: decision_organization_strategy
+    query: "organization strategy scheduled jobs cleanup"
+    expected_any:
+      - "2026-04-22"
+      - "organization-strategy"
+    category: decision
+
+  # --- Cross-reference (A-references-B) ---
+  - id: xref_david_marshal
+    query: "what did David and I discuss about Marshal"
+    expected_any:
+      - "david-cochran"
+      - "projects/marshal"
+    category: cross_ref
+
+  - id: xref_scott_newman
+    query: "Scott Newman University MS Data Science"
+    expected_any:
+      - "newman"
+      - "user.md"
+    category: cross_ref
+
+  # --- Alias / typo resolution (these often miss until entity graph is clean) ---
+  - id: alias_marshall_typo
+    query: "Marshall project David working group"
+    expected_any:
+      - "projects/marshal"
+      - "entities/projects/marshal"
+    category: alias
+
+  # --- Skills & capabilities recall ---
+  - id: skill_weekly_signal_diff
+    query: "weekly signal diff macro structural changes"
+    expected_any:
+      - "weekly-signal-diff"
+      - "skills/weekly-signal-diff"
+    category: skill
+
+  - id: skill_canvas
+    query: "Canvas LMS assignments grades Newman"
+    expected_any:
+      - "skills/canvas"
+    category: skill
+
+  # --- Memory / curated knowledge ---
+  - id: memory_browser_feedback
+    query: "browser automation tools which to use"
+    expected_any:
+      - "feedback_browser"
+      - "browser"
+    category: memory
+
+  - id: memory_python_venv
+    query: "Python venv pip install"
+    expected_any:
+      - "feedback_python_venv"
+      - "memory"
+    category: memory
+
+  # --- Scheduler / infra ---
+  - id: infra_entity_graph
+    query: "entity graph daily timeline extraction"
+    expected_any:
+      - "entity-graph"
+      - "schedules"
+    category: infra
+
+  - id: infra_scheduler
+    query: "how to schedule a task launchd cron"
+    expected_any:
+      - "skills/scheduler"
+      - "schedules.yaml"
+    category: infra
