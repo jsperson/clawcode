@@ -26,18 +26,6 @@ servers:
     required_by: [gmail]
     setup_notes: "Run scripts/gmail-oauth-setup.sh for one-time Google OAuth authorization."
 
-  browser:
-    transport: stdio
-    command: node
-    args: ["mcp-servers/browser/index.js"]
-    env:
-      BROWSER_TIMEOUT: "30000"
-    required_by: [browser]
-    setup_notes: >
-      Browser automation via OpenClaw CLI wrapping Chrome DevTools Protocol.
-      Requires: OpenClaw gateway running (openclaw browser start),
-      Chrome extension "OpenClaw Browser Relay" installed and attached.
-
   qmd:
     transport: stdio
     command: /Users/jsperson/.bun/bin/qmd
