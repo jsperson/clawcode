@@ -17,11 +17,10 @@ metadata:
 
 Control Chrome directly via CDP using the `browser-harness` CLI. No MCP server, no extension — just a persistent daemon attached to Chrome with a self-extending Python helpers file.
 
-**Full operating manual lives in the upstream repo — read it before using:**
+**Full operating manual lives in the upstream repo — read when you need depth:**
 
 - `~/source/browser-harness/SKILL.md` — day-to-day usage, tool call shape, gotchas
 - `~/source/browser-harness/helpers.py` — all available functions (preloaded into every call)
-- `~/source/browser-harness/install.md` — only for first-time install / reconnect
 
 ## Invocation shape
 
@@ -34,31 +33,54 @@ screenshot("/tmp/shot.png")
 PY
 ```
 
-Helpers are pre-imported. The daemon auto-starts. Use `new_tab(url)` for first navigation — `goto(url)` clobbers the user's active tab.
+Helpers are pre-imported. Use `new_tab(url)` for first navigation — `goto(url)` clobbers the user's active tab.
 
 ## Self-extension
 
 When you hit a capability gap, **edit `~/source/browser-harness/helpers.py` directly** to add what's missing. The install is editable, so the next `browser-harness` invocation picks up your edit.
 
-This is the intended workflow — the repo README literally says "the agent writes what's missing, mid-task."
+After meaningful edits: `git -C ~/source/browser-harness add -A && git -C ~/source/browser-harness commit -m "add <helper>"`. Don't commit secrets.
 
-**Hygiene:** after meaningful edits to `helpers.py`, `git -C ~/source/browser-harness add -A && git -C ~/source/browser-harness commit -m "add <helper>"` so we have rollback. Don't commit secrets.
+## Auto-remediation — handle failures yourself, don't ask
 
-## Prerequisites
+**These are known failure modes with canonical fixes. Apply them silently, then retry. Do NOT ask the user which option to pick.**
 
-- Chrome running (local Chrome is dedicated to AI — use it freely)
-- Remote debugging enabled (one-time per profile; already set up)
-- `browser-harness` on PATH (installed via `uv tool install -e ~/source/browser-harness`)
+### "CDP port 9222 isn't listening" / "Connect call failed" / daemon won't come up
 
-## Troubleshooting
+**Fix:** Chrome isn't running (or isn't running with debug flags). Run the launcher, wait briefly, retry once:
 
-| Problem | Solution |
-|---------|----------|
-| `daemon didn't come up` | Chrome not running or remote debugging disabled; `open -a "Google Chrome"` then retry |
-| `DevToolsActivePort not found` | Open `chrome://inspect/#remote-debugging`, tick the checkbox, click Allow |
-| `no close frame received or sent` | Stale daemon; run `browser-harness --doctor`; if needed restart daemon |
-| Update banner appears | Run `browser-harness --update -y` yourself, don't ask Scott |
-| Completely stuck | `browser-harness --doctor` for full diagnostic |
+```bash
+~/bin/chrome-ai
+sleep 2
+# retry the original browser-harness call
+```
+
+That's it. The launcher handles killing any stale Chrome, starting a fresh one with `--remote-debugging-port=9222`, writing the correct `BU_CDP_WS` to `~/source/browser-harness/.env`, and waiting for the port to be live.
+
+**Do not:**
+- Tell the user to open `chrome://inspect`
+- Run `browser-harness --setup`
+- Ask which option they want
+- Offer fallbacks — there is one fix, apply it
+
+### "CDP WS handshake failed: server rejected WebSocket connection: HTTP 404"
+
+**Fix:** First-invocation race after Chrome start. Retry the exact same `browser-harness` call once. If it still fails, fall through to the launcher remediation above.
+
+### Auth wall (redirected to login page)
+
+**Fix:** This is the one case you DO ask the user. Tell them they need to log in in the AI Chrome window (it's visible on screen). Do NOT type credentials from screenshots. After the user confirms login, retry.
+
+### Update banner at top of output
+
+**Fix:** Run `browser-harness --update -y` yourself. Don't ask.
+
+## Prerequisites (already in place)
+
+- Chrome dedicated to AI on this machine — use it freely
+- `browser-harness` installed via `uv tool install -e ~/source/browser-harness`
+- `~/bin/chrome-ai` launcher + `com.clawcode.chrome-ai` LaunchAgent auto-start Chrome on login
+- Dedicated profile at `~/.chrome-ai-profile` (session cookies persist across restarts)
 
 ## Notes
 
