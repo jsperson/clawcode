@@ -17,7 +17,14 @@ echo ""
 if [ "$SOURCE_DIR" != "$INSTALL_DIR" ]; then
     echo "→ Syncing project to $INSTALL_DIR..."
     mkdir -p "$INSTALL_DIR"
-    rsync -a --exclude='.venv' --exclude='__pycache__' --exclude='.git' --exclude='.env' \
+    # Note: intentionally no --delete. The deployed copy at $INSTALL_DIR is
+    # also a working directory where runtime accretions live (proposals/,
+    # life-agent/ output, scouting reports, hook offsets, daily logs).
+    # Stale files that source has removed must be cleaned up manually.
+    rsync -a \
+        --exclude='.venv' --exclude='.git' --exclude='.env' \
+        --exclude='__pycache__' --exclude='*.pyc' --exclude='*.egg-info' \
+        --exclude='node_modules' --exclude='.DS_Store' \
         --exclude='config/schedules.yaml' \
         --exclude='USER.md' --exclude='MEMORY.md' --exclude='HEARTBEAT.md' \
         "$SOURCE_DIR/" "$INSTALL_DIR/"
