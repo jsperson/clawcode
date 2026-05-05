@@ -21,6 +21,12 @@ MEMORY.md
 HEARTBEAT.md
 proposals/
 
+# Runtime accretions (life-agent skills emit these in deployed)
+life-agent/
+
+# Claude Code tool output (plans dropped by /ce-plan etc.)
+.claude/plans/
+
 # Playwright / MCP
 .playwright-mcp/
 .mcp.json
